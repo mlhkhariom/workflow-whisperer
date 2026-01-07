@@ -166,11 +166,14 @@ export function useDeleteProduct() {
 
 // Chats - Raw message from n8n
 interface RawChatMessage {
-  id: number;
-  contact_uid: string;
-  content: string;
-  role: 'user' | 'assistant';
-  created_at: string;
+  id?: number;
+  contactUid: string;
+  firstName?: string;
+  phoneNumber?: string;
+  phoneNumberId?: string;
+  messageText: string;
+  role?: 'user' | 'assistant';
+  created_at?: string;
 }
 
 export interface ChatMessage {
@@ -184,6 +187,7 @@ export interface ChatMessage {
 export interface ChatContact {
   id: string;
   name: string;
+  phoneNumber: string;
   lastMessage: string;
   time: string;
   unread: number;
@@ -191,6 +195,7 @@ export interface ChatContact {
 }
 
 function formatRelativeTime(dateStr: string): string {
+  if (!dateStr) return '';
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -207,14 +212,20 @@ function formatRelativeTime(dateStr: string): string {
 
 // Derive contacts list from all messages
 function deriveContactsFromMessages(messages: RawChatMessage[]): ChatContact[] {
-  const contactMap = new Map<string, { messages: RawChatMessage[] }>();
+  const contactMap = new Map<string, { messages: RawChatMessage[]; firstName?: string; phoneNumber?: string }>();
 
   for (const msg of messages) {
-    if (!msg.contact_uid) continue;
-    if (!contactMap.has(msg.contact_uid)) {
-      contactMap.set(msg.contact_uid, { messages: [] });
+    const contactId = msg.contactUid;
+    if (!contactId) continue;
+    
+    if (!contactMap.has(contactId)) {
+      contactMap.set(contactId, { messages: [], firstName: msg.firstName, phoneNumber: msg.phoneNumber });
     }
-    contactMap.get(msg.contact_uid)!.messages.push(msg);
+    const entry = contactMap.get(contactId)!;
+    entry.messages.push(msg);
+    // Update name/phone if available
+    if (msg.firstName) entry.firstName = msg.firstName;
+    if (msg.phoneNumber) entry.phoneNumber = msg.phoneNumber;
   }
 
   const contacts: ChatContact[] = [];
@@ -222,17 +233,18 @@ function deriveContactsFromMessages(messages: RawChatMessage[]): ChatContact[] {
   for (const [contactId, data] of contactMap.entries()) {
     // Sort messages by created_at descending to get latest
     const sorted = data.messages.sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
     );
     const lastMsg = sorted[0];
-    const unreadCount = sorted.filter(m => m.role === 'user').length; // Simplified: count user messages
+    const unreadCount = sorted.filter(m => m.role === 'user').length;
 
     contacts.push({
       id: contactId,
-      name: `Contact ${contactId.slice(0, 8)}`,
-      lastMessage: lastMsg?.content ?? '',
-      time: lastMsg ? formatRelativeTime(lastMsg.created_at) : '',
-      unread: Math.min(unreadCount, 9), // Cap at 9 for display
+      name: data.firstName || `Contact ${contactId.slice(0, 8)}`,
+      phoneNumber: data.phoneNumber || '',
+      lastMessage: lastMsg?.messageText ?? '',
+      time: lastMsg?.created_at ? formatRelativeTime(lastMsg.created_at) : '',
+      unread: Math.min(unreadCount, 9),
       online: false,
     });
   }
@@ -250,11 +262,11 @@ function deriveContactsFromMessages(messages: RawChatMessage[]): ChatContact[] {
 // Normalize raw message to our ChatMessage format
 function normalizeMessage(raw: RawChatMessage): ChatMessage {
   return {
-    id: String(raw.id),
-    contactId: raw.contact_uid,
-    message: raw.content,
+    id: String(raw.id ?? crypto.randomUUID()),
+    contactId: raw.contactUid,
+    message: raw.messageText,
     sender: raw.role === 'assistant' ? 'agent' : 'user',
-    timestamp: raw.created_at,
+    timestamp: raw.created_at || new Date().toISOString(),
   };
 }
 
@@ -289,8 +301,8 @@ export function useChatMessages(contactId: string | null) {
     select: (messages) => {
       if (!contactId) return [];
       return messages
-        .filter(m => m.contact_uid === contactId)
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .filter(m => m.contactUid === contactId)
+        .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime())
         .map(normalizeMessage);
     },
   });

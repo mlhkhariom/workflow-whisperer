@@ -17,8 +17,11 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
   const filteredContacts = contacts.filter(c => {
     const name = c.name || '';
     const lastMessage = c.lastMessage || '';
-    return name.toLowerCase().includes(search.toLowerCase()) ||
-      lastMessage.toLowerCase().includes(search.toLowerCase());
+    const phone = c.phoneNumber || '';
+    const searchLower = search.toLowerCase();
+    return name.toLowerCase().includes(searchLower) ||
+      lastMessage.toLowerCase().includes(searchLower) ||
+      phone.includes(search);
   });
 
   return (
