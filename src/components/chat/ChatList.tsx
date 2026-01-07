@@ -1,24 +1,9 @@
 import { useState } from "react";
-import { Search, User } from "lucide-react";
+import { Search, User, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-
-interface Contact {
-  id: string;
-  name: string;
-  lastMessage: string;
-  time: string;
-  unread: number;
-  online: boolean;
-}
-
-const mockContacts: Contact[] = [
-  { id: "1", name: "User #1234", lastMessage: "Looking for a gaming laptop", time: "2m", unread: 2, online: true },
-  { id: "2", name: "User #5678", lastMessage: "Thanks for the help!", time: "15m", unread: 0, online: true },
-  { id: "3", name: "User #9012", lastMessage: "What accessories do you have?", time: "32m", unread: 1, online: false },
-  { id: "4", name: "User #3456", lastMessage: "Can I see desktop options?", time: "1h", unread: 0, online: false },
-  { id: "5", name: "User #7890", lastMessage: "Perfect, I'll take it!", time: "2h", unread: 0, online: false },
-];
+import { Button } from "@/components/ui/button";
+import { useChats, type ChatContact } from "@/hooks/useN8nData";
 
 interface ChatListProps {
   selectedId: string | null;
@@ -27,16 +12,22 @@ interface ChatListProps {
 
 export function ChatList({ selectedId, onSelect }: ChatListProps) {
   const [search, setSearch] = useState("");
+  const { data: contacts = [], isLoading, error, refetch } = useChats();
 
-  const filteredContacts = mockContacts.filter(c => 
+  const filteredContacts = contacts.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.lastMessage.toLowerCase().includes(search.toLowerCase())
+    c.lastMessage?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="w-80 h-full border-r border-border flex flex-col bg-card/50">
       <div className="p-4 border-b border-border">
-        <h2 className="font-semibold mb-4">Conversations</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold">Conversations</h2>
+          <Button variant="ghost" size="icon" onClick={() => refetch()} disabled={isLoading}>
+            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+          </Button>
+        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -49,6 +40,30 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">
+        {isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+            <span className="text-sm text-muted-foreground">Loading chats...</span>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-4 text-center">
+            <p className="text-sm text-destructive mb-2">Failed to load chats</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {!isLoading && !error && filteredContacts.length === 0 && (
+          <div className="p-4 text-center text-muted-foreground text-sm">
+            {contacts.length === 0 
+              ? "No conversations yet. Set up n8n webhook."
+              : "No conversations match your search."}
+          </div>
+        )}
+
         {filteredContacts.map((contact) => (
           <button
             key={contact.id}
