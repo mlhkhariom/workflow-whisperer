@@ -33,10 +33,26 @@ export interface Product {
   status: string;
 }
 
+// Fetch all product categories and combine them
+async function fetchAllProducts(): Promise<Product[]> {
+  const [laptops, desktops, accessories] = await Promise.all([
+    callN8n<Product[]>('get-laptop').catch(() => []),
+    callN8n<Product[]>('get-desktops').catch(() => []),
+    callN8n<Product[]>('get-accessories').catch(() => []),
+  ]);
+  
+  // Add category to each product based on source
+  const taggedLaptops = (laptops || []).map(p => ({ ...p, category: p.category || 'Laptops' }));
+  const taggedDesktops = (desktops || []).map(p => ({ ...p, category: p.category || 'Desktops' }));
+  const taggedAccessories = (accessories || []).map(p => ({ ...p, category: p.category || 'Accessories' }));
+  
+  return [...taggedLaptops, ...taggedDesktops, ...taggedAccessories];
+}
+
 export function useProducts() {
   return useQuery({
     queryKey: ['products'],
-    queryFn: () => callN8n<Product[]>('get-products'),
+    queryFn: fetchAllProducts,
     staleTime: 30000,
   });
 }
