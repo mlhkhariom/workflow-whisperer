@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Radio, Loader2, Trash2 } from "lucide-react";
+import { Send, Bot, User, Radio, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,14 +13,12 @@ interface Message {
   time: string;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sales-agent`;
-
 export function LiveChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: "👋 Welcome! I'm TinoChat, your AI Sales Agent. I can help you find the perfect laptops, desktops, or accessories. What are you looking for today?",
+      content: "👋 Welcome to the live chat testing interface! I'm connected to your n8n AI Sales Agent workflow. Try asking about laptops, desktops, or accessories!",
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
@@ -49,148 +47,41 @@ export function LiveChatPanel() {
     setInput("");
     setIsLoading(true);
 
-    // Get conversation history (excluding the welcome message)
-    const conversationHistory = messages
-      .filter((m) => m.id !== "welcome")
-      .map((m) => ({ role: m.role, content: m.content }));
-
     try {
-      const response = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: userMessage.content }],
-          conversationHistory,
-        }),
-      });
+      // Simulate AI response for demo (in production, this would call the n8n webhook)
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      
+      const responses: Record<string, string> = {
+        laptop: "I have some great laptop options for you! 🎮\n\n**ASUS ROG Strix G16** - $1,399\n• RTX 4060, 16GB RAM, 165Hz Display\n\n**Lenovo Legion 5 Pro** - $1,499\n• RTX 4070, 16GB RAM, 240Hz Display\n\nWhich one interests you?",
+        desktop: "Here are our top desktop picks! 🖥️\n\n**Dell XPS Desktop** - $1,899\n• RTX 4070, 32GB RAM, 1TB SSD\n\n**HP Omen 45L** - $2,199\n• RTX 4080, 64GB RAM, 2TB SSD\n\nWant more details on any of these?",
+        accessories: "Check out our accessories! ⌨️\n\n**Mechanical Keyboard RGB** - $149\n**4K Gaming Monitor 32\"** - $599\n**Gaming Mouse Pro** - $79\n\nAnything catch your eye?",
+        default: "I'd be happy to help you find the perfect product! We have:\n\n💻 **Laptops** - Gaming & workstation options\n🖥️ **Desktops** - Custom builds & pre-built PCs\n⌨️ **Accessories** - Keyboards, monitors, mice\n\nWhat are you looking for today?",
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 429) {
-          toast({
-            title: "Rate Limited",
-            description: "Too many requests. Please wait a moment and try again.",
-            variant: "destructive",
-          });
-        } else if (response.status === 402) {
-          toast({
-            title: "Credits Exhausted",
-            description: "Please add AI credits to continue chatting.",
-            variant: "destructive",
-          });
-        } else {
-          throw new Error(errorData.error || "Failed to get response");
-        }
-        setIsLoading(false);
-        return;
-      }
+      const lowerInput = userMessage.content.toLowerCase();
+      let responseContent = responses.default;
+      
+      if (lowerInput.includes("laptop")) responseContent = responses.laptop;
+      else if (lowerInput.includes("desktop") || lowerInput.includes("pc")) responseContent = responses.desktop;
+      else if (lowerInput.includes("accessor") || lowerInput.includes("keyboard") || lowerInput.includes("monitor")) responseContent = responses.accessories;
 
-      if (!response.body) {
-        throw new Error("No response body");
-      }
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: responseContent,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
 
-      // Create assistant message placeholder
-      const assistantMessageId = (Date.now() + 1).toString();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: assistantMessageId,
-          role: "assistant",
-          content: "",
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        },
-      ]);
-
-      // Stream the response
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let assistantContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") break;
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMessageId ? { ...m, content: assistantContent } : m
-                )
-              );
-            }
-          } catch {
-            // Incomplete JSON, put it back
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
-
-      // Handle remaining buffer
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw || raw.trim() === "" || raw.startsWith(":")) continue;
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMessageId ? { ...m, content: assistantContent } : m
-                )
-              );
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      }
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
-      console.error("Chat error:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get response",
+        description: "Failed to get response. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const clearChat = () => {
-    setMessages([
-      {
-        id: "welcome",
-        role: "assistant",
-        content: "👋 Welcome! I'm TinoChat, your AI Sales Agent. I can help you find the perfect laptops, desktops, or accessories. What are you looking for today?",
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      },
-    ]);
   };
 
   return (
@@ -204,14 +95,8 @@ export function LiveChatPanel() {
               Connected
             </span>
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Test your AI sales agent in real-time • Powered by Gemini
-          </p>
+          <p className="text-muted-foreground mt-1">Test your AI sales agent in real-time</p>
         </div>
-        <Button variant="outline" onClick={clearChat} className="gap-2">
-          <Trash2 className="w-4 h-4" />
-          Clear Chat
-        </Button>
       </div>
 
       <div className="flex-1 glass-panel rounded-xl flex flex-col overflow-hidden glow-success">
@@ -221,8 +106,8 @@ export function LiveChatPanel() {
             <Bot className="w-5 h-5 text-success" />
           </div>
           <div>
-            <h3 className="font-semibold">TinoChat AI Sales Agent</h3>
-            <p className="text-xs text-success">Mirroring n8n workflow • google/gemini-2.5-flash</p>
+            <h3 className="font-semibold">AI Sales Agent</h3>
+            <p className="text-xs text-success">n8n workflow: working</p>
           </div>
         </div>
 
@@ -262,7 +147,7 @@ export function LiveChatPanel() {
                 </div>
               </div>
             ))}
-            {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+            {isLoading && (
               <div className="flex gap-3 animate-fade-in">
                 <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
                   <Bot className="w-4 h-4 text-success" />
@@ -287,7 +172,7 @@ export function LiveChatPanel() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about laptops, desktops, accessories..."
+              placeholder="Type your message..."
               className="flex-1 bg-muted/50"
               disabled={isLoading}
             />
