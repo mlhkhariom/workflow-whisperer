@@ -164,7 +164,15 @@ export function useDeleteProduct() {
   });
 }
 
-// Chats
+// Chats - Raw message from n8n
+interface RawChatMessage {
+  id: number;
+  contact_uid: string;
+  content: string;
+  role: 'user' | 'assistant';
+  created_at: string;
+}
+
 export interface ChatMessage {
   id: string;
   contactId: string;
@@ -182,24 +190,109 @@ export interface ChatContact {
   online: boolean;
 }
 
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+// Derive contacts list from all messages
+function deriveContactsFromMessages(messages: RawChatMessage[]): ChatContact[] {
+  const contactMap = new Map<string, { messages: RawChatMessage[] }>();
+
+  for (const msg of messages) {
+    if (!msg.contact_uid) continue;
+    if (!contactMap.has(msg.contact_uid)) {
+      contactMap.set(msg.contact_uid, { messages: [] });
+    }
+    contactMap.get(msg.contact_uid)!.messages.push(msg);
+  }
+
+  const contacts: ChatContact[] = [];
+
+  for (const [contactId, data] of contactMap.entries()) {
+    // Sort messages by created_at descending to get latest
+    const sorted = data.messages.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    const lastMsg = sorted[0];
+    const unreadCount = sorted.filter(m => m.role === 'user').length; // Simplified: count user messages
+
+    contacts.push({
+      id: contactId,
+      name: `Contact ${contactId.slice(0, 8)}`,
+      lastMessage: lastMsg?.content ?? '',
+      time: lastMsg ? formatRelativeTime(lastMsg.created_at) : '',
+      unread: Math.min(unreadCount, 9), // Cap at 9 for display
+      online: false,
+    });
+  }
+
+  // Sort contacts by most recent message
+  contacts.sort((a, b) => {
+    const aTime = contactMap.get(a.id)?.messages[0]?.created_at ?? '';
+    const bTime = contactMap.get(b.id)?.messages[0]?.created_at ?? '';
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
+  });
+
+  return contacts;
+}
+
+// Normalize raw message to our ChatMessage format
+function normalizeMessage(raw: RawChatMessage): ChatMessage {
+  return {
+    id: String(raw.id),
+    contactId: raw.contact_uid,
+    message: raw.content,
+    sender: raw.role === 'assistant' ? 'agent' : 'user',
+    timestamp: raw.created_at,
+  };
+}
+
+// Store all messages globally for both contacts list and individual chat
+let cachedMessages: RawChatMessage[] = [];
+
+async function fetchAllMessages(): Promise<RawChatMessage[]> {
+  const messages = await callN8n<RawChatMessage[]>('get-chats');
+  cachedMessages = messages || [];
+  return cachedMessages;
+}
+
 export function useChats() {
   return useQuery({
-    queryKey: ['chats'],
-    queryFn: () => callN8n<ChatContact[]>('get-chats'),
+    queryKey: ['all-messages'],
+    queryFn: fetchAllMessages,
     staleTime: 5_000,
     refetchInterval: 5_000,
     refetchIntervalInBackground: true,
+    select: (messages) => deriveContactsFromMessages(messages),
   });
 }
 
 export function useChatMessages(contactId: string | null) {
   return useQuery({
-    queryKey: ['chat-messages', contactId],
-    queryFn: () => callN8n<ChatMessage[]>('get-chat-messages', { contactId }),
-    enabled: !!contactId,
-    staleTime: 2_000,
-    refetchInterval: 2_000,
+    queryKey: ['all-messages'],
+    queryFn: fetchAllMessages,
+    staleTime: 5_000,
+    refetchInterval: 5_000,
     refetchIntervalInBackground: true,
+    enabled: !!contactId,
+    select: (messages) => {
+      if (!contactId) return [];
+      return messages
+        .filter(m => m.contact_uid === contactId)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .map(normalizeMessage);
+    },
   });
 }
 
@@ -209,9 +302,8 @@ export function useSendMessage() {
   return useMutation({
     mutationFn: ({ contactId, message }: { contactId: string; message: string }) => 
       callN8n('send-message', { contactId, message }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['chat-messages', variables.contactId] });
-      queryClient.invalidateQueries({ queryKey: ['chats'] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-messages'] });
     },
   });
 }

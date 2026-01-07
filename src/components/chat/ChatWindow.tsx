@@ -1,29 +1,30 @@
-import { User, Bot, MoreVertical } from "lucide-react";
+import { User, Bot, MoreVertical, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  time: string;
-}
-
-const mockMessages: Message[] = [
-  { id: "1", role: "user", content: "Hi, I'm looking for a gaming laptop", time: "10:32 AM" },
-  { id: "2", role: "assistant", content: "Hello! I'd be happy to help you find the perfect gaming laptop. What's your budget range, and are there any specific features you're looking for like high refresh rate display, specific GPU requirements, or portability?", time: "10:32 AM" },
-  { id: "3", role: "user", content: "Budget around $1500, need good graphics for AAA games", time: "10:33 AM" },
-  { id: "4", role: "assistant", content: "Great choice! For $1500, I can recommend some excellent options with RTX 4060/4070 GPUs. Let me show you our top picks:", time: "10:33 AM" },
-  { id: "5", role: "user", content: "That sounds good, show me what you have", time: "10:34 AM" },
-  { id: "6", role: "assistant", content: "Here are our top gaming laptops in your budget:\n\n🎮 **ASUS ROG Strix G16** - $1,399\n• RTX 4060, 16GB RAM, 165Hz Display\n• Great for most AAA games at high settings\n\n🎮 **Lenovo Legion 5 Pro** - $1,499\n• RTX 4070, 16GB RAM, 240Hz Display\n• Excellent cooling, premium build\n\nWould you like more details on any of these?", time: "10:34 AM" },
-];
+import { useChatMessages } from "@/hooks/useN8nData";
+import { useEffect, useRef } from "react";
 
 interface ChatWindowProps {
   contactId: string | null;
 }
 
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 export function ChatWindow({ contactId }: ChatWindowProps) {
+  const { data: messages = [], isLoading, error } = useChatMessages(contactId);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   if (!contactId) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
@@ -50,8 +51,8 @@ export function ChatWindow({ contactId }: ChatWindowProps) {
             <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-success border-2 border-card" />
           </div>
           <div>
-            <h3 className="font-semibold">User #{contactId}234</h3>
-            <p className="text-xs text-success">Online</p>
+            <h3 className="font-semibold">Contact {contactId.slice(0, 8)}</h3>
+            <p className="text-xs text-muted-foreground">{messages.length} messages</p>
           </div>
         </div>
         <Button variant="ghost" size="icon">
@@ -60,21 +61,40 @@ export function ChatWindow({ contactId }: ChatWindowProps) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-6">
-        <div className="space-y-6">
-          {mockMessages.map((message) => (
+      <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+        {isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+            <span className="text-sm text-muted-foreground">Loading messages...</span>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-sm text-destructive">Failed to load messages</p>
+          </div>
+        )}
+
+        {!isLoading && !error && messages.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">No messages in this conversation</p>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          {messages.map((message) => (
             <div
               key={message.id}
               className={cn(
                 "flex gap-3 animate-fade-in",
-                message.role === "user" && "flex-row-reverse"
+                message.sender === "user" && "flex-row-reverse"
               )}
             >
               <div className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                message.role === "user" ? "bg-primary/20" : "bg-success/20"
+                message.sender === "user" ? "bg-primary/20" : "bg-success/20"
               )}>
-                {message.role === "user" ? (
+                {message.sender === "user" ? (
                   <User className="w-4 h-4 text-primary" />
                 ) : (
                   <Bot className="w-4 h-4 text-success" />
@@ -82,10 +102,12 @@ export function ChatWindow({ contactId }: ChatWindowProps) {
               </div>
               <div className={cn(
                 "max-w-[70%] rounded-2xl px-4 py-3",
-                message.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"
+                message.sender === "user" ? "chat-bubble-user" : "chat-bubble-assistant"
               )}>
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                <span className="text-xs text-muted-foreground mt-2 block">{message.time}</span>
+                <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+                <span className="text-xs text-muted-foreground mt-2 block">
+                  {formatTime(message.timestamp)}
+                </span>
               </div>
             </div>
           ))}
