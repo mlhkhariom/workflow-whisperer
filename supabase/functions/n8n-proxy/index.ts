@@ -26,16 +26,15 @@ serve(async (req) => {
     const { action, data } = await req.json();
     console.log(`Processing action: ${action}`, data);
 
-    // Build the full webhook URL with the action as endpoint
-    const webhookUrl = `${n8nWebhookUrl}/${action}`;
-    console.log(`Calling n8n webhook: ${webhookUrl}`);
+    // Call the n8n webhook directly with action in body
+    console.log(`Calling n8n webhook: ${n8nWebhookUrl}`);
 
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data || {}),
+      body: JSON.stringify({ action, data }),
     });
 
     if (!response.ok) {
