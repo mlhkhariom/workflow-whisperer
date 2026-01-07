@@ -307,9 +307,12 @@ let cachedNormalizedMessages: NormalizedRawMessage[] = [];
 
 async function fetchAllMessages(): Promise<NormalizedRawMessage[]> {
   const rawMessages = await callN8n<RawChatMessageFromApi[]>('get-chats');
+  console.log('Raw messages from n8n:', rawMessages);
   const normalized = (rawMessages || [])
     .map(normalizeRawMessage)
     .filter((m): m is NormalizedRawMessage => m !== null);
+  console.log('Normalized messages:', normalized);
+  console.log('Derived contacts:', deriveContactsFromMessages(normalized));
   cachedNormalizedMessages = normalized;
   return cachedNormalizedMessages;
 }
