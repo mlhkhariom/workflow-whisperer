@@ -159,8 +159,10 @@ export function ProductsPanel() {
                           <span className="capitalize">{product.category}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono">${Number(product.price).toLocaleString()}</TableCell>
-                      <TableCell>{product.stock}</TableCell>
+                      <TableCell className="font-mono">
+                        {product.price == null ? "—" : `$${product.price.toLocaleString()}`}
+                      </TableCell>
+                      <TableCell>{product.stock ?? "—"}</TableCell>
                       <TableCell>
                         <Badge 
                           variant="outline" 
