@@ -1,24 +1,9 @@
 import { useState } from "react";
-import { Search, User } from "lucide-react";
+import { Search, User, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-
-interface Contact {
-  id: string;
-  name: string;
-  lastMessage: string;
-  time: string;
-  unread: number;
-  online: boolean;
-}
-
-const mockContacts: Contact[] = [
-  { id: "1", name: "User #1234", lastMessage: "Looking for a gaming laptop", time: "2m", unread: 2, online: true },
-  { id: "2", name: "User #5678", lastMessage: "Thanks for the help!", time: "15m", unread: 0, online: true },
-  { id: "3", name: "User #9012", lastMessage: "What accessories do you have?", time: "32m", unread: 1, online: false },
-  { id: "4", name: "User #3456", lastMessage: "Can I see desktop options?", time: "1h", unread: 0, online: false },
-  { id: "5", name: "User #7890", lastMessage: "Perfect, I'll take it!", time: "2h", unread: 0, online: false },
-];
+import { useChats } from "@/hooks/useN8nData";
+import { formatDistanceToNow } from "date-fns";
 
 interface ChatListProps {
   selectedId: string | null;
@@ -27,10 +12,12 @@ interface ChatListProps {
 
 export function ChatList({ selectedId, onSelect }: ChatListProps) {
   const [search, setSearch] = useState("");
+  const { data: chats = [], isLoading, error } = useChats();
 
-  const filteredContacts = mockContacts.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.lastMessage.toLowerCase().includes(search.toLowerCase())
+  const filteredChats = chats.filter(c => 
+    c.name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.last_message?.toLowerCase().includes(search.toLowerCase()) ||
+    c.contact_uid?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -49,37 +36,57 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">
-        {filteredContacts.map((contact) => (
-          <button
-            key={contact.id}
-            onClick={() => onSelect(contact.id)}
-            className={cn(
-              "w-full p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border/50",
-              selectedId === contact.id && "bg-primary/10 border-l-2 border-l-primary"
-            )}
-          >
-            <div className="relative">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                <User className="w-5 h-5 text-muted-foreground" />
-              </div>
-              {contact.online && (
-                <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-success border-2 border-card" />
+        {isLoading ? (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            <p>Failed to load chats</p>
+            <p className="text-xs mt-1">Check n8n connection</p>
+          </div>
+        ) : filteredChats.length === 0 ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No conversations found
+          </div>
+        ) : (
+          filteredChats.map((chat) => (
+            <button
+              key={chat.contact_uid}
+              onClick={() => onSelect(chat.contact_uid)}
+              className={cn(
+                "w-full p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors text-left border-b border-border/50",
+                selectedId === chat.contact_uid && "bg-primary/10 border-l-2 border-l-primary"
               )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm">{contact.name}</span>
-                <span className="text-xs text-muted-foreground">{contact.time}</span>
+            >
+              <div className="relative">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <User className="w-5 h-5 text-muted-foreground" />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground truncate mt-0.5">{contact.lastMessage}</p>
-            </div>
-            {contact.unread > 0 && (
-              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
-                {contact.unread}
-              </span>
-            )}
-          </button>
-        ))}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm truncate">
+                    {chat.name || `User ${chat.contact_uid.slice(-6)}`}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {chat.last_message_time 
+                      ? formatDistanceToNow(new Date(chat.last_message_time), { addSuffix: false })
+                      : ""}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground truncate mt-0.5">
+                  {chat.last_message || "No messages"}
+                </p>
+              </div>
+              {chat.unread_count > 0 && (
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                  {chat.unread_count}
+                </span>
+              )}
+            </button>
+          ))
+        )}
       </div>
     </div>
   );

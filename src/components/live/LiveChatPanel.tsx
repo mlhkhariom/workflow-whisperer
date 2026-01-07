@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useSendMessage, useChatMessages } from "@/hooks/useN8nData";
 
 interface Message {
   id: string;
@@ -13,8 +14,11 @@ interface Message {
   time: string;
 }
 
+// Test contact ID for live chat demo
+const TEST_CONTACT_UID = "live-chat-test";
+
 export function LiveChatPanel() {
-  const [messages, setMessages] = useState<Message[]>([
+  const [localMessages, setLocalMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
@@ -23,18 +27,36 @@ export function LiveChatPanel() {
     },
   ]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  
+  const sendMessage = useSendMessage();
+  const { data: n8nMessages = [] } = useChatMessages(TEST_CONTACT_UID);
+
+  // Merge n8n messages with local messages
+  useEffect(() => {
+    if (n8nMessages.length > 0) {
+      const formatted: Message[] = n8nMessages.map(m => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      }));
+      setLocalMessages(prev => {
+        const welcomeMsg = prev.find(m => m.id === "welcome");
+        return welcomeMsg ? [welcomeMsg, ...formatted] : formatted;
+      });
+    }
+  }, [n8nMessages]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [localMessages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || sendMessage.isPending) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -43,44 +65,25 @@ export function LiveChatPanel() {
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setLocalMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setIsLoading(true);
 
     try {
-      // Simulate AI response for demo (in production, this would call the n8n webhook)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await sendMessage.mutateAsync({
+        contactUid: TEST_CONTACT_UID,
+        message: userMessage.content,
+      });
       
-      const responses: Record<string, string> = {
-        laptop: "I have some great laptop options for you! 🎮\n\n**ASUS ROG Strix G16** - $1,399\n• RTX 4060, 16GB RAM, 165Hz Display\n\n**Lenovo Legion 5 Pro** - $1,499\n• RTX 4070, 16GB RAM, 240Hz Display\n\nWhich one interests you?",
-        desktop: "Here are our top desktop picks! 🖥️\n\n**Dell XPS Desktop** - $1,899\n• RTX 4070, 32GB RAM, 1TB SSD\n\n**HP Omen 45L** - $2,199\n• RTX 4080, 64GB RAM, 2TB SSD\n\nWant more details on any of these?",
-        accessories: "Check out our accessories! ⌨️\n\n**Mechanical Keyboard RGB** - $149\n**4K Gaming Monitor 32\"** - $599\n**Gaming Mouse Pro** - $79\n\nAnything catch your eye?",
-        default: "I'd be happy to help you find the perfect product! We have:\n\n💻 **Laptops** - Gaming & workstation options\n🖥️ **Desktops** - Custom builds & pre-built PCs\n⌨️ **Accessories** - Keyboards, monitors, mice\n\nWhat are you looking for today?",
-      };
-
-      const lowerInput = userMessage.content.toLowerCase();
-      let responseContent = responses.default;
-      
-      if (lowerInput.includes("laptop")) responseContent = responses.laptop;
-      else if (lowerInput.includes("desktop") || lowerInput.includes("pc")) responseContent = responses.desktop;
-      else if (lowerInput.includes("accessor") || lowerInput.includes("keyboard") || lowerInput.includes("monitor")) responseContent = responses.accessories;
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: responseContent,
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+      toast({
+        title: "Message sent",
+        description: "Waiting for AI response from n8n...",
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to get response. Please try again.",
+        description: "Failed to send message to n8n. Check your webhook configuration.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -92,7 +95,7 @@ export function LiveChatPanel() {
             Live Chat
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-success/20 text-success text-sm font-medium">
               <Radio className="w-4 h-4 animate-pulse" />
-              Connected
+              Connected to n8n
             </span>
           </h1>
           <p className="text-muted-foreground mt-1">Test your AI sales agent in real-time</p>
@@ -114,7 +117,7 @@ export function LiveChatPanel() {
         {/* Messages */}
         <ScrollArea className="flex-1 p-6" ref={scrollRef}>
           <div className="space-y-6">
-            {messages.map((message) => (
+            {localMessages.map((message) => (
               <div
                 key={message.id}
                 className={cn(
@@ -147,7 +150,7 @@ export function LiveChatPanel() {
                 </div>
               </div>
             ))}
-            {isLoading && (
+            {sendMessage.isPending && (
               <div className="flex gap-3 animate-fade-in">
                 <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
                   <Bot className="w-4 h-4 text-success" />
@@ -174,11 +177,11 @@ export function LiveChatPanel() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type your message..."
               className="flex-1 bg-muted/50"
-              disabled={isLoading}
+              disabled={sendMessage.isPending}
             />
             <Button
               type="submit"
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || sendMessage.isPending}
               className="bg-success hover:bg-success/90 text-success-foreground glow-success"
             >
               <Send className="w-4 h-4" />
