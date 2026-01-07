@@ -14,10 +14,12 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
   const [search, setSearch] = useState("");
   const { data: contacts = [], isLoading, error, refetch } = useChats();
 
-  const filteredContacts = contacts.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.lastMessage?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredContacts = contacts.filter(c => {
+    const name = c.name || '';
+    const lastMessage = c.lastMessage || '';
+    return name.toLowerCase().includes(search.toLowerCase()) ||
+      lastMessage.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <div className="w-80 h-full border-r border-border flex flex-col bg-card/50">
