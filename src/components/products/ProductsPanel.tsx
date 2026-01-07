@@ -40,8 +40,10 @@ export function ProductsPanel() {
   const { data: products = [], isLoading, error, refetch } = useProducts();
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || p.category === categoryFilter;
+    const name = p.name || '';
+    const category = p.category || '';
+    const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === "all" || category.toLowerCase() === categoryFilter.toLowerCase();
     return matchesSearch && matchesCategory;
   });
 
