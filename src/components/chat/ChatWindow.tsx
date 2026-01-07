@@ -1,12 +1,13 @@
-import { User, Bot, MoreVertical, Loader2 } from "lucide-react";
+import { User, Bot, MoreVertical, Loader2, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useChatMessages } from "@/hooks/useN8nData";
+import { useChatMessages, type ChatContact } from "@/hooks/useN8nData";
 import { useEffect, useRef } from "react";
 
 interface ChatWindowProps {
   contactId: string | null;
+  contact?: ChatContact | null;
 }
 
 function formatTime(dateStr: string): string {
@@ -14,7 +15,7 @@ function formatTime(dateStr: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function ChatWindow({ contactId }: ChatWindowProps) {
+export function ChatWindow({ contactId, contact }: ChatWindowProps) {
   const { data: messages = [], isLoading, error } = useChatMessages(contactId);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +40,9 @@ export function ChatWindow({ contactId }: ChatWindowProps) {
     );
   }
 
+  const displayName = contact?.name || `Contact ${contactId.slice(0, 8)}`;
+  const phoneNumber = contact?.phoneNumber || '';
+
   return (
     <div className="flex-1 flex flex-col bg-background">
       {/* Header */}
@@ -51,8 +55,15 @@ export function ChatWindow({ contactId }: ChatWindowProps) {
             <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-success border-2 border-card" />
           </div>
           <div>
-            <h3 className="font-semibold">Contact {contactId.slice(0, 8)}</h3>
-            <p className="text-xs text-muted-foreground">{messages.length} messages</p>
+            <h3 className="font-semibold">{displayName}</h3>
+            {phoneNumber ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Phone className="w-3 h-3" />
+                {phoneNumber}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">{messages.length} messages</p>
+            )}
           </div>
         </div>
         <Button variant="ghost" size="icon">
