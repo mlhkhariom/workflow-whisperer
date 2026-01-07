@@ -164,16 +164,32 @@ export function useDeleteProduct() {
   });
 }
 
-// Chats - Raw message from n8n
-interface RawChatMessage {
+// Chats - Raw message from n8n (supports both old and new field names)
+interface RawChatMessageFromApi {
   id?: number;
-  contactUid: string;
+  // New field names
+  contactUid?: string;
   firstName?: string;
   phoneNumber?: string;
   phoneNumberId?: string;
-  messageText: string;
+  messageText?: string;
+  // Old field names (fallback)
+  contact_uid?: string;
+  content?: string;
+  // Common fields
   role?: 'user' | 'assistant';
   created_at?: string;
+}
+
+// Normalized internal format
+interface NormalizedRawMessage {
+  id: number | string;
+  contactUid: string;
+  firstName?: string;
+  phoneNumber?: string;
+  messageText: string;
+  role: 'user' | 'assistant';
+  created_at: string;
 }
 
 export interface ChatMessage {
@@ -194,6 +210,22 @@ export interface ChatContact {
   online: boolean;
 }
 
+// Normalize raw API message to consistent format
+function normalizeRawMessage(raw: RawChatMessageFromApi): NormalizedRawMessage | null {
+  const contactUid = raw.contactUid || raw.contact_uid;
+  if (!contactUid) return null;
+  
+  return {
+    id: raw.id ?? crypto.randomUUID(),
+    contactUid,
+    firstName: raw.firstName,
+    phoneNumber: raw.phoneNumber,
+    messageText: raw.messageText || raw.content || '',
+    role: raw.role || 'user',
+    created_at: raw.created_at || new Date().toISOString(),
+  };
+}
+
 function formatRelativeTime(dateStr: string): string {
   if (!dateStr) return '';
   const date = new Date(dateStr);
@@ -211,8 +243,8 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 // Derive contacts list from all messages
-function deriveContactsFromMessages(messages: RawChatMessage[]): ChatContact[] {
-  const contactMap = new Map<string, { messages: RawChatMessage[]; firstName?: string; phoneNumber?: string }>();
+function deriveContactsFromMessages(messages: NormalizedRawMessage[]): ChatContact[] {
+  const contactMap = new Map<string, { messages: NormalizedRawMessage[]; firstName?: string; phoneNumber?: string }>();
 
   for (const msg of messages) {
     const contactId = msg.contactUid;
@@ -260,23 +292,26 @@ function deriveContactsFromMessages(messages: RawChatMessage[]): ChatContact[] {
 }
 
 // Normalize raw message to our ChatMessage format
-function normalizeMessage(raw: RawChatMessage): ChatMessage {
+function normalizeToChatMessage(raw: NormalizedRawMessage): ChatMessage {
   return {
-    id: String(raw.id ?? crypto.randomUUID()),
+    id: String(raw.id),
     contactId: raw.contactUid,
     message: raw.messageText,
     sender: raw.role === 'assistant' ? 'agent' : 'user',
-    timestamp: raw.created_at || new Date().toISOString(),
+    timestamp: raw.created_at,
   };
 }
 
 // Store all messages globally for both contacts list and individual chat
-let cachedMessages: RawChatMessage[] = [];
+let cachedNormalizedMessages: NormalizedRawMessage[] = [];
 
-async function fetchAllMessages(): Promise<RawChatMessage[]> {
-  const messages = await callN8n<RawChatMessage[]>('get-chats');
-  cachedMessages = messages || [];
-  return cachedMessages;
+async function fetchAllMessages(): Promise<NormalizedRawMessage[]> {
+  const rawMessages = await callN8n<RawChatMessageFromApi[]>('get-chats');
+  const normalized = (rawMessages || [])
+    .map(normalizeRawMessage)
+    .filter((m): m is NormalizedRawMessage => m !== null);
+  cachedNormalizedMessages = normalized;
+  return cachedNormalizedMessages;
 }
 
 export function useChats() {
@@ -291,7 +326,7 @@ export function useChats() {
 }
 
 export function useChatMessages(contactId: string | null) {
-  return useQuery({
+  return useQuery<NormalizedRawMessage[], Error, ChatMessage[]>({
     queryKey: ['all-messages'],
     queryFn: fetchAllMessages,
     staleTime: 5_000,
@@ -303,7 +338,7 @@ export function useChatMessages(contactId: string | null) {
       return messages
         .filter(m => m.contactUid === contactId)
         .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime())
-        .map(normalizeMessage);
+        .map(normalizeToChatMessage);
     },
   });
 }
