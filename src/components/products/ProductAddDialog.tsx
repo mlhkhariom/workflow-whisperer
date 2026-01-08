@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Image } from "lucide-react";
+import { Loader2, Plus, Image, Upload } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useProductImageUpload } from "@/hooks/useProductImageUpload";
 import type { Product } from "@/hooks/useN8nData";
 
 interface ProductAddDialogProps {
@@ -41,8 +42,26 @@ const defaultFormData = {
 
 export function ProductAddDialog({ open, onOpenChange, onSave, isLoading }: ProductAddDialogProps) {
   const [formData, setFormData] = useState(defaultFormData);
+  const { uploadImage, uploading } = useProductImageUpload();
+  const fileInput1Ref = useRef<HTMLInputElement>(null);
+  const fileInput2Ref = useRef<HTMLInputElement>(null);
 
   const resetForm = () => setFormData(defaultFormData);
+
+  const handleImageUpload = async (file: File, imageField: 'image_url_1' | 'image_url_2') => {
+    const productName = formData.category === 'accessories' 
+      ? formData.name 
+      : `${formData.brand} ${formData.model}`.trim();
+    
+    if (!productName) {
+      return;
+    }
+
+    const imageUrl = await uploadImage(file, `${productName}-${imageField === 'image_url_1' ? 'primary' : 'secondary'}`);
+    if (imageUrl) {
+      setFormData(prev => ({ ...prev, [imageField]: imageUrl }));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,30 +323,76 @@ export function ProductAddDialog({ open, onOpenChange, onSave, isLoading }: Prod
               </div>
             )}
 
-            {/* Image URLs */}
+            {/* Image URLs & Upload */}
             <div className="space-y-4 p-4 rounded-xl bg-secondary/20 border border-border/30">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Image className="w-4 h-4" />
-                Image URLs
+                Product Images (JPG only)
               </div>
               <div className="space-y-3">
+                {/* Primary Image */}
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Primary Image</Label>
-                  <Input
-                    value={formData.image_url_1}
-                    onChange={(e) => setFormData({ ...formData, image_url_1: e.target.value })}
-                    className="bg-secondary/30 border-border/50"
-                    placeholder="https://example.com/image1.jpg"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      value={formData.image_url_1}
+                      onChange={(e) => setFormData({ ...formData, image_url_1: e.target.value })}
+                      className="bg-secondary/30 border-border/50 flex-1"
+                      placeholder="https://example.com/image1.jpg"
+                    />
+                    <input
+                      type="file"
+                      ref={fileInput1Ref}
+                      accept=".jpg,.jpeg,image/jpeg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, 'image_url_1');
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={uploading || (!formData.brand && !formData.name)}
+                      onClick={() => fileInput1Ref.current?.click()}
+                      title={!formData.brand && !formData.name ? "Enter product name first" : "Upload JPG image"}
+                    >
+                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
+                {/* Secondary Image */}
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Secondary Image</Label>
-                  <Input
-                    value={formData.image_url_2}
-                    onChange={(e) => setFormData({ ...formData, image_url_2: e.target.value })}
-                    className="bg-secondary/30 border-border/50"
-                    placeholder="https://example.com/image2.jpg"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      value={formData.image_url_2}
+                      onChange={(e) => setFormData({ ...formData, image_url_2: e.target.value })}
+                      className="bg-secondary/30 border-border/50 flex-1"
+                      placeholder="https://example.com/image2.jpg"
+                    />
+                    <input
+                      type="file"
+                      ref={fileInput2Ref}
+                      accept=".jpg,.jpeg,image/jpeg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, 'image_url_2');
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={uploading || (!formData.brand && !formData.name)}
+                      onClick={() => fileInput2Ref.current?.click()}
+                      title={!formData.brand && !formData.name ? "Enter product name first" : "Upload JPG image"}
+                    >
+                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
               {formData.image_url_1 && (
@@ -357,7 +422,7 @@ export function ProductAddDialog({ open, onOpenChange, onSave, isLoading }: Prod
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={isLoading || (isAccessory ? !formData.name : !formData.brand)}
+            disabled={isLoading || uploading || (isAccessory ? !formData.name : !formData.brand)}
             className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
           >
             {isLoading ? (
