@@ -20,6 +20,7 @@ interface ProductEditDialogProps {
 
 export function ProductEditDialog({ product, open, onOpenChange, onSave, isLoading }: ProductEditDialogProps) {
   const [formData, setFormData] = useState<Partial<Product>>({});
+  const [dragOver, setDragOver] = useState<'primary' | 'secondary' | null>(null);
   const { uploadImage, uploading } = useProductImageUpload();
   const fileInput1Ref = useRef<HTMLInputElement>(null);
   const fileInput2Ref = useRef<HTMLInputElement>(null);
@@ -44,6 +45,22 @@ export function ProductEditDialog({ product, open, onOpenChange, onSave, isLoadi
       setFormData(prev => ({ ...prev, [imageField]: imageUrl }));
     }
   };
+
+  const handleDrop = (e: React.DragEvent, imageField: 'image_url_1' | 'image_url_2') => {
+    e.preventDefault();
+    setDragOver(null);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type === 'image/jpeg' || file.type === 'image/jpg')) {
+      handleImageUpload(file, imageField);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent, field: 'primary' | 'secondary') => {
+    e.preventDefault();
+    setDragOver(field);
+  };
+
+  const handleDragLeave = () => setDragOver(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,96 +282,124 @@ export function ProductEditDialog({ product, open, onOpenChange, onSave, isLoadi
               </div>
             )}
 
-            {/* Image URLs & Upload */}
+            {/* Image URLs & Upload with Drag-Drop */}
             <div className="space-y-4 p-4 rounded-xl bg-secondary/20 border border-border/30">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Image className="w-4 h-4" />
-                Product Images (JPG only)
+                Product Images (JPG only - Drag & Drop supported)
               </div>
-              <div className="space-y-3">
-                {/* Primary Image */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Primary Image</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={formData.image_url_1 || ''}
-                      onChange={(e) => setFormData({ ...formData, image_url_1: e.target.value })}
-                      className="bg-secondary/30 border-border/50 flex-1"
-                      placeholder="https://example.com/image1.jpg"
-                    />
-                    <input
-                      type="file"
-                      ref={fileInput1Ref}
-                      accept=".jpg,.jpeg,image/jpeg"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file, 'image_url_1');
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      disabled={uploading}
-                      onClick={() => fileInput1Ref.current?.click()}
-                      title="Upload JPG image"
-                    >
-                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-                {/* Secondary Image */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Secondary Image</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={formData.image_url_2 || ''}
-                      onChange={(e) => setFormData({ ...formData, image_url_2: e.target.value })}
-                      className="bg-secondary/30 border-border/50 flex-1"
-                      placeholder="https://example.com/image2.jpg"
-                    />
-                    <input
-                      type="file"
-                      ref={fileInput2Ref}
-                      accept=".jpg,.jpeg,image/jpeg"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file, 'image_url_2');
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      disabled={uploading}
-                      onClick={() => fileInput2Ref.current?.click()}
-                      title="Upload JPG image"
-                    >
-                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              {formData.image_url_1 && (
-                <div className="flex gap-2 mt-2">
-                  <img 
-                    src={formData.image_url_1} 
-                    alt="Preview 1" 
-                    className="w-16 h-16 rounded-lg object-cover border border-border/30"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Primary Image Drop Zone */}
+                <div 
+                  className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer ${
+                    dragOver === 'primary' 
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-border/50 hover:border-primary/50 hover:bg-secondary/30'
+                  }`}
+                  onDrop={(e) => handleDrop(e, 'image_url_1')}
+                  onDragOver={(e) => handleDragOver(e, 'primary')}
+                  onDragLeave={handleDragLeave}
+                  onClick={() => fileInput1Ref.current?.click()}
+                >
+                  <input
+                    type="file"
+                    ref={fileInput1Ref}
+                    accept=".jpg,.jpeg,image/jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, 'image_url_1');
+                    }}
                   />
-                  {formData.image_url_2 && (
-                    <img 
-                      src={formData.image_url_2} 
-                      alt="Preview 2" 
-                      className="w-16 h-16 rounded-lg object-cover border border-border/30"
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
+                  {formData.image_url_1 ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={formData.image_url_1} 
+                        alt="Primary" 
+                        className="w-full h-24 object-cover rounded-lg"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <p className="text-xs text-muted-foreground truncate">{formData.image_url_1.split('/').pop()}</p>
+                    </div>
+                  ) : (
+                    <div className="py-4">
+                      <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-xs text-muted-foreground">Primary Image</p>
+                      <p className="text-xs text-muted-foreground/60">Drop or Click</p>
+                    </div>
+                  )}
+                  {uploading && dragOver === 'primary' && (
+                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-xl">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
                   )}
                 </div>
-              )}
+
+                {/* Secondary Image Drop Zone */}
+                <div 
+                  className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer ${
+                    dragOver === 'secondary' 
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-border/50 hover:border-primary/50 hover:bg-secondary/30'
+                  }`}
+                  onDrop={(e) => handleDrop(e, 'image_url_2')}
+                  onDragOver={(e) => handleDragOver(e, 'secondary')}
+                  onDragLeave={handleDragLeave}
+                  onClick={() => fileInput2Ref.current?.click()}
+                >
+                  <input
+                    type="file"
+                    ref={fileInput2Ref}
+                    accept=".jpg,.jpeg,image/jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, 'image_url_2');
+                    }}
+                  />
+                  {formData.image_url_2 ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={formData.image_url_2} 
+                        alt="Secondary" 
+                        className="w-full h-24 object-cover rounded-lg"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <p className="text-xs text-muted-foreground truncate">{formData.image_url_2.split('/').pop()}</p>
+                    </div>
+                  ) : (
+                    <div className="py-4">
+                      <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-xs text-muted-foreground">Secondary Image</p>
+                      <p className="text-xs text-muted-foreground/60">Drop or Click</p>
+                    </div>
+                  )}
+                  {uploading && dragOver === 'secondary' && (
+                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-xl">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* URL Input fallback */}
+              <div className="space-y-2 pt-2 border-t border-border/30">
+                <Label className="text-xs text-muted-foreground">Or paste image URL directly:</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    value={formData.image_url_1 || ''}
+                    onChange={(e) => setFormData({ ...formData, image_url_1: e.target.value })}
+                    className="bg-secondary/30 border-border/50 text-xs"
+                    placeholder="Primary image URL"
+                  />
+                  <Input
+                    value={formData.image_url_2 || ''}
+                    onChange={(e) => setFormData({ ...formData, image_url_2: e.target.value })}
+                    className="bg-secondary/30 border-border/50 text-xs"
+                    placeholder="Secondary image URL"
+                  />
+                </div>
+              </div>
             </div>
           </form>
         </ScrollArea>
