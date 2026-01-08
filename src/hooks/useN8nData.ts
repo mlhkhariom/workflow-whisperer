@@ -7,7 +7,7 @@ interface N8nResponse<T> {
 }
 
 async function callN8n<T>(action: string, data?: unknown): Promise<T> {
-  const { data: response, error } = await supabase.functions.invoke('n8n-proxy', {
+  const { data: response, error } = await supabase.functions.invoke('postgres-api', {
     body: { action, data },
   });
 
