@@ -63,6 +63,17 @@ serve(async (req) => {
     let result: any;
 
     switch (action) {
+      // Debug - List all tables
+      case 'list-tables':
+        result = await client.queryObject(`
+          SELECT table_name, table_schema 
+          FROM information_schema.tables 
+          WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+          ORDER BY table_schema, table_name
+        `);
+        console.log('Tables found:', result.rows);
+        return jsonResponse(result.rows);
+
       // Products - GET
       case 'get-laptop':
         result = await client.queryObject('SELECT * FROM laptops ORDER BY id');
@@ -139,14 +150,14 @@ serve(async (req) => {
         await client.queryObject('DELETE FROM accessories WHERE id = $1', [data?.id]);
         return jsonResponse({ success: true });
 
-      // Chats
+      // Chats - using chat_messages table
       case 'get-chats':
-        result = await client.queryObject('SELECT * FROM chats ORDER BY created_at DESC');
+        result = await client.queryObject('SELECT * FROM chat_messages ORDER BY "createdAt" DESC');
         return jsonResponse(result.rows);
 
       case 'send-message':
         result = await client.queryObject(
-          `INSERT INTO chats (contact_uid, message_text, role, created_at) 
+          `INSERT INTO chat_messages ("contactUid", "messageText", role, "createdAt") 
            VALUES ($1, $2, 'assistant', NOW()) RETURNING *`,
           [data?.contactId, data?.message]
         );
