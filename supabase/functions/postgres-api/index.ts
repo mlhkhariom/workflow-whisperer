@@ -101,7 +101,7 @@ serve(async (req) => {
                                 screen_size, graphics, condition, price_range, stock_quantity, 
                                 special_feature, warranty_in_months, image_url_1, image_url_2, updated_at) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW()) 
-           RETURNING row_number, *`,
+           RETURNING *`,
           [
             data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
             data?.ram_gb || null, data?.storage_type || '', data?.storage_gb || null,
@@ -119,7 +119,7 @@ serve(async (req) => {
              storage_type = $6, storage_gb = $7, screen_size = $8, graphics = $9, 
              condition = $10, price_range = $11, stock_quantity = $12, special_feature = $13,
              warranty_in_months = $14, image_url_1 = $15, image_url_2 = $16, updated_at = NOW()
-           WHERE row_number = $17 RETURNING row_number, *`,
+           WHERE row_number = $17 RETURNING *`,
           [
             data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
             data?.ram_gb || null, data?.storage_type || '', data?.storage_gb || null,
@@ -151,7 +151,7 @@ serve(async (req) => {
                                  monitor_size, graphics, condition, price_range, stock_quantity,
                                  special_feature, warranty_in_months, image_url_1, image_url_2, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
-           RETURNING row_number, *`,
+           RETURNING *`,
           [
             data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
             data?.ram_gb || null, data?.ram_type || '', data?.storage_gb || null,
@@ -169,7 +169,7 @@ serve(async (req) => {
              ram_type = $6, storage_gb = $7, monitor_size = $8, graphics = $9,
              condition = $10, price_range = $11, stock_quantity = $12, special_feature = $13,
              warranty_in_months = $14, image_url_1 = $15, image_url_2 = $16, updated_at = NOW()
-           WHERE row_number = $17 RETURNING row_number, *`,
+           WHERE row_number = $17 RETURNING *`,
           [
             data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
             data?.ram_gb || null, data?.ram_type || '', data?.storage_gb || null,
@@ -196,7 +196,7 @@ serve(async (req) => {
       case 'add-accessory':
         result = await client.queryObject(
           `INSERT INTO accessories (accessories_name, price_range_inr, image_url_1, image_url_2, updated_at)
-           VALUES ($1, $2, $3, $4, NOW()) RETURNING row_number, *`,
+           VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
           [data?.name || '', data?.price_range || '', data?.image_url_1 || null, data?.image_url_2 || null]
         );
         return jsonResponse(result.rows[0] || { success: true });
@@ -205,7 +205,7 @@ serve(async (req) => {
         result = await client.queryObject(
           `UPDATE accessories SET 
              accessories_name = $1, price_range_inr = $2, image_url_1 = $3, image_url_2 = $4, updated_at = NOW()
-           WHERE row_number = $5 RETURNING row_number, *`,
+           WHERE row_number = $5 RETURNING *`,
           [data?.name || '', data?.price_range || '', data?.image_url_1 || null, data?.image_url_2 || null, data?.id]
         );
         return jsonResponse(result.rows[0] || { success: true });
