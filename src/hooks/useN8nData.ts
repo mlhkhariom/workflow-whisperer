@@ -131,11 +131,54 @@ export function useProducts() {
   });
 }
 
+// Get action name based on category
+function getUpdateAction(category: string): string {
+  switch (category.toLowerCase()) {
+    case 'laptops':
+      return 'update-laptop';
+    case 'desktops':
+      return 'update-desktop';
+    case 'accessories':
+      return 'update-accessory';
+    default:
+      return 'update-product';
+  }
+}
+
+function getDeleteAction(category: string): string {
+  switch (category.toLowerCase()) {
+    case 'laptops':
+      return 'delete-laptop';
+    case 'desktops':
+      return 'delete-desktop';
+    case 'accessories':
+      return 'delete-accessory';
+    default:
+      return 'delete-product';
+  }
+}
+
+function getAddAction(category: string): string {
+  switch (category.toLowerCase()) {
+    case 'laptops':
+      return 'add-laptop';
+    case 'desktops':
+      return 'add-desktop';
+    case 'accessories':
+      return 'add-accessory';
+    default:
+      return 'add-product';
+  }
+}
+
 export function useAddProduct() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (product: Omit<Product, 'id'>) => callN8n('add-product', product),
+    mutationFn: (product: Omit<Product, 'id'>) => {
+      const action = getAddAction(product.category);
+      return callN8n(action, product);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
@@ -146,7 +189,11 @@ export function useUpdateProduct() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (product: Product) => callN8n('update-product', product),
+    mutationFn: (product: Product) => {
+      const action = getUpdateAction(product.category);
+      console.log('Updating product with action:', action, product);
+      return callN8n(action, product);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
@@ -157,7 +204,11 @@ export function useDeleteProduct() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (id: string) => callN8n('delete-product', { id }),
+    mutationFn: ({ id, category }: { id: string; category: string }) => {
+      const action = getDeleteAction(category);
+      console.log('Deleting product with action:', action, { id, category });
+      return callN8n(action, { id });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
     },
