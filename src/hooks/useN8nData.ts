@@ -130,6 +130,7 @@ function normalizeDesktop(raw: any): Product {
 function normalizeAccessory(raw: any): Product {
   const id = String(raw?.row_number ?? crypto.randomUUID());
   const displayName = raw?.accessories_name || `Accessory ${id}`;
+  const stockQty = raw?.stock_quantity ?? null;
   
   return {
     id,
@@ -139,10 +140,10 @@ function normalizeAccessory(raw: any): Product {
     image_url_1: raw?.image_url_1 || null,
     image_url_2: raw?.image_url_2 || null,
     updated_at: raw?.updated_at || null,
-    status: 'active',
+    status: computeStatus(stockQty),
     displayName,
     price: parsePriceToNumber(raw?.price_range_inr),
-    stock_quantity: null,
+    stock_quantity: stockQty,
   };
 }
 
