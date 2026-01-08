@@ -1,73 +1,192 @@
-# Welcome to your Lovable project
+# AI LaptopWala - WhatsApp Sales Agent Admin Panel
 
-## Project info
+A modern, responsive admin dashboard for managing a WhatsApp-based AI Sales Agent. Built with React, TypeScript, and Tailwind CSS.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![Admin Panel](https://img.shields.io/badge/Admin-Panel-blue) ![React](https://img.shields.io/badge/React-18-61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6) ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC)
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🚀 Features
 
-**Use Lovable**
+### 📊 Dashboard Overview
+- Real-time statistics and analytics
+- Quick view of products, conversations, and system status
+- Visual metrics with charts and graphs
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 💬 Conversations Panel
+- View all WhatsApp customer conversations
+- Real-time message sync with n8n workflows
+- Contact management and chat history
 
-Changes made via Lovable will be committed automatically to this repo.
+### 📦 Products Management
+- Full CRUD operations for:
+  - **Laptops** - With specifications (processor, RAM, storage, graphics)
+  - **Desktops** - With monitor size and component details
+  - **Accessories** - With pricing and availability
+- **Grid & Table Views** - Switch between card and table layouts
+- **Status Filtering** - Filter by In Stock, Low Stock, Out of Stock
+- **Category Filtering** - Filter by product category
+- **Search & Sort** - Find products quickly
+- **Quick Stock Edit** - Update inventory inline
+- **Image Upload** - Cloudinary integration for product images
 
-**Use your preferred IDE**
+### 🖼️ Product Images
+- Bulk image upload to Cloudinary
+- Image management and preview
+- Drag & drop support
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 🔴 Live Chat
+- Real-time chat testing interface
+- Simulate customer-agent conversations
+- Debug AI agent responses
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## 🔐 Login Credentials
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+Username: Ailaptop
+Password: Laptop@9165
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🛠️ Tech Stack
 
-**Use GitHub Codespaces**
+| Technology | Purpose |
+|------------|---------|
+| React 18 | UI Framework |
+| TypeScript | Type Safety |
+| Tailwind CSS | Styling |
+| Vite | Build Tool |
+| TanStack Query | Data Fetching |
+| Lucide React | Icons |
+| Sonner | Toast Notifications |
+| shadcn/ui | UI Components |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
+## 📁 Project Structure
 
-This project is built with:
+```
+src/
+├── components/
+│   ├── chat/           # Chat and conversation components
+│   ├── dashboard/      # Dashboard widgets and stats
+│   ├── images/         # Image upload panel
+│   ├── layout/         # Sidebar and navigation
+│   ├── live/           # Live chat testing
+│   ├── products/       # Product management (CRUD dialogs)
+│   └── ui/             # shadcn/ui components
+├── hooks/
+│   ├── useAuth.tsx     # Authentication context
+│   ├── useN8nData.ts   # Data fetching hooks
+│   └── ...
+├── pages/
+│   ├── Index.tsx       # Main dashboard page
+│   ├── Login.tsx       # Login page
+│   └── NotFound.tsx    # 404 page
+└── integrations/
+    └── supabase/       # Backend connection
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+## 🔧 Backend Integration
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Edge Functions
 
-## Can I connect a custom domain to my Lovable project?
+| Function | Purpose |
+|----------|---------|
+| `postgres-api` | Direct PostgreSQL connection for CRUD operations |
+| `cloudinary-upload` | Image upload handling |
+| `n8n-proxy` | n8n workflow integration |
 
-Yes, you can!
+### Environment Variables
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+The following secrets are configured:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `EXTERNAL_POSTGRES_URL` - External PostgreSQL database connection
+- `CLOUDINARY_CLOUD_NAME` - Cloudinary cloud name
+- `CLOUDINARY_API_KEY` - Cloudinary API key
+- `CLOUDINARY_API_SECRET` - Cloudinary API secret
+- `N8N_WEBHOOK_URL` - n8n webhook endpoint
+
+---
+
+## 📱 Responsive Design
+
+- **Desktop** - Full sidebar with collapsible option
+- **Tablet** - Adaptive layout
+- **Mobile** - Bottom navigation and hamburger menu
+
+---
+
+## 🎨 UI Features
+
+- **Glassmorphism Design** - Modern glass-panel aesthetic
+- **Dark Theme** - Eye-friendly dark mode
+- **Animations** - Smooth transitions with Tailwind
+- **Status Indicators** - Color-coded product status
+  - 🟢 Green - In Stock
+  - 🟠 Orange - Low Stock
+  - 🔴 Red - Out of Stock
+
+---
+
+## 📋 Database Schema
+
+### Laptops Table
+```
+- row_number (ID)
+- brand, model
+- processor, generation
+- ram_gb, storage_type, storage_gb
+- screen_size, graphics
+- condition, price_range
+- stock_quantity
+- image_url_1, image_url_2
+```
+
+### Desktops Table
+```
+- row_number (ID)
+- brand, model
+- processor, generation
+- ram_gb, ram_type, storage_gb
+- monitor_size, graphics
+- condition, price_range
+- stock_quantity
+- image_url_1, image_url_2
+```
+
+### Accessories Table
+```
+- row_number (ID)
+- accessories_name
+- price_range_inr
+- stock_quantity
+- image_url_1, image_url_2
+```
+
+---
+
+## 🚀 Getting Started
+
+1. **Clone the repository**
+2. **Install dependencies**: `npm install`
+3. **Start development server**: `npm run dev`
+4. **Open**: `http://localhost:5173`
+
+---
+
+## 👨‍💻 Developer
+
+**MLHK Infotech**  
+Built with ❤️ by Hariom Vishwkarma
+
+---
+
+## 📄 License
+
+This project is proprietary software. All rights reserved.
