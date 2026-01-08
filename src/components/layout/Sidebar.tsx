@@ -1,7 +1,8 @@
-import { MessageSquare, Package, Radio, LayoutDashboard, Settings, Zap, ChevronLeft, ChevronRight, ImageIcon, Menu, X } from "lucide-react";
+import { MessageSquare, Package, Radio, LayoutDashboard, Zap, ChevronLeft, ChevronRight, ImageIcon, Menu, X, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SidebarProps {
   activeTab: string;
@@ -19,6 +20,7 @@ const navItems = [
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { logout } = useAuth();
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -136,12 +138,15 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
         {/* Bottom Section */}
         <div className="p-4 border-t border-sidebar-border space-y-3">
-          <button className={cn(
-            "nav-item w-full",
-            collapsed && "justify-center px-3"
-          )}>
-            <Settings className="w-5 h-5 text-muted-foreground" />
-            {!collapsed && <span>Settings</span>}
+          <button 
+            onClick={logout}
+            className={cn(
+              "nav-item w-full text-destructive hover:bg-destructive/10",
+              collapsed && "justify-center px-3"
+            )}
+          >
+            <LogOut className="w-5 h-5" />
+            {!collapsed && <span>Logout</span>}
           </button>
 
           {!collapsed && (
@@ -204,9 +209,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
         {/* Bottom Section */}
         <div className="p-4 border-t border-sidebar-border space-y-3">
-          <button className="nav-item w-full">
-            <Settings className="w-5 h-5 text-muted-foreground" />
-            <span>Settings</span>
+          <button 
+            onClick={logout}
+            className="nav-item w-full text-destructive hover:bg-destructive/10"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Logout</span>
           </button>
 
           <div className="px-4 py-3 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
