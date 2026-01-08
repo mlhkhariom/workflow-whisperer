@@ -19,7 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useProducts, type Product } from "@/hooks/useN8nData";
+import { useProducts, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useN8nData";
+import { ProductEditDialog } from "./ProductEditDialog";
+import { ProductDeleteDialog } from "./ProductDeleteDialog";
+import { toast } from "sonner";
 
 const categoryIcons: Record<string, typeof Laptop> = {
   laptops: Laptop,
@@ -48,8 +51,51 @@ const statusConfig: Record<string, { icon: typeof Package; class: string; label:
 export function ProductsPanel() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   
   const { data: products = [], isLoading, error, refetch } = useProducts();
+  const updateMutation = useUpdateProduct();
+  const deleteMutation = useDeleteProduct();
+
+  const handleEdit = (product: Product) => {
+    setEditProduct(product);
+  };
+
+  const handleSaveEdit = (updatedProduct: Product) => {
+    updateMutation.mutate(updatedProduct, {
+      onSuccess: () => {
+        toast.success("Product updated successfully!");
+        setEditProduct(null);
+        refetch();
+      },
+      onError: (err) => {
+        toast.error(`Failed to update product: ${err.message}`);
+      },
+    });
+  };
+
+  const handleDelete = (product: Product) => {
+    setDeleteProduct(product);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteProduct) {
+      deleteMutation.mutate(
+        { id: deleteProduct.id, category: deleteProduct.category },
+        {
+          onSuccess: () => {
+            toast.success("Product deleted successfully!");
+            setDeleteProduct(null);
+            refetch();
+          },
+          onError: (err) => {
+            toast.error(`Failed to delete product: ${err.message}`);
+          },
+        }
+      );
+    }
+  };
 
   const filteredProducts = products.filter(p => {
     const name = p.name || '';
@@ -274,6 +320,7 @@ export function ProductsPanel() {
                             variant="ghost" 
                             size="icon" 
                             className="h-9 w-9 hover:bg-primary/10 hover:text-primary rounded-lg"
+                            onClick={() => handleEdit(product)}
                           >
                             <Edit2 className="w-4 h-4" />
                           </Button>
@@ -281,6 +328,7 @@ export function ProductsPanel() {
                             variant="ghost" 
                             size="icon" 
                             className="h-9 w-9 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-lg"
+                            onClick={() => handleDelete(product)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -294,6 +342,24 @@ export function ProductsPanel() {
           </Table>
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <ProductEditDialog
+        product={editProduct}
+        open={!!editProduct}
+        onOpenChange={(open) => !open && setEditProduct(null)}
+        onSave={handleSaveEdit}
+        isLoading={updateMutation.isPending}
+      />
+
+      {/* Delete Dialog */}
+      <ProductDeleteDialog
+        product={deleteProduct}
+        open={!!deleteProduct}
+        onOpenChange={(open) => !open && setDeleteProduct(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }
