@@ -1,14 +1,12 @@
 import { useState, useMemo } from "react";
-import { Search, Loader2, RefreshCw, MessageCircle, MessageSquare, Phone, Filter, Calendar, Mail, X } from "lucide-react";
+import { Search, Loader2, RefreshCw, MessageCircle, MessageSquare, Phone, Filter, Calendar, Mail, X, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useChats, type ChatContact } from "@/hooks/useN8nData";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format, isAfter, isBefore, startOfDay, endOfDay, subDays } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ChatListProps {
   selectedId: string | null;
@@ -17,11 +15,13 @@ interface ChatListProps {
 
 type DateFilter = 'all' | 'today' | 'week' | 'month' | 'custom';
 type UnreadFilter = 'all' | 'unread' | 'read';
+type SortOption = 'date-desc' | 'date-asc' | 'unread' | 'name-asc' | 'name-desc';
 
 export function ChatList({ selectedId, onSelect }: ChatListProps) {
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [unreadFilter, setUnreadFilter] = useState<UnreadFilter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>();
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>();
   const [showFilters, setShowFilters] = useState(false);
@@ -30,8 +30,29 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
 
   const hasActiveFilters = dateFilter !== 'all' || unreadFilter !== 'all';
 
-  const filteredContacts = useMemo(() => {
-    return contacts.filter(c => {
+  // Helper to parse relative time to sortable value
+  const parseTimeToMs = (time: string): number => {
+    if (!time) return 0;
+    if (time === 'Just now') return Date.now();
+    
+    const match = time.match(/(\d+)([mhd])\s*ago/);
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
+      const now = Date.now();
+      if (unit === 'm') return now - value * 60 * 1000;
+      if (unit === 'h') return now - value * 60 * 60 * 1000;
+      if (unit === 'd') return now - value * 24 * 60 * 60 * 1000;
+    }
+    
+    // Try parsing as date
+    const parsed = Date.parse(time);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const filteredAndSortedContacts = useMemo(() => {
+    // First filter
+    const filtered = contacts.filter(c => {
       // Text search
       const name = c.name || '';
       const lastMessage = c.lastMessage || '';
@@ -49,7 +70,6 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
 
       // Date filter - parse the time string to check date
       if (dateFilter !== 'all' && c.time) {
-        const now = new Date();
         const contactTime = c.time;
         
         // Simple time parsing from relative time
@@ -72,13 +92,42 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
 
       return true;
     });
-  }, [contacts, search, unreadFilter, dateFilter]);
+
+    // Then sort
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc':
+          return parseTimeToMs(b.time) - parseTimeToMs(a.time);
+        case 'date-asc':
+          return parseTimeToMs(a.time) - parseTimeToMs(b.time);
+        case 'unread':
+          return b.unread - a.unread;
+        case 'name-asc':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        default:
+          return 0;
+      }
+    });
+  }, [contacts, search, unreadFilter, dateFilter, sortBy]);
 
   const clearFilters = () => {
     setDateFilter('all');
     setUnreadFilter('all');
+    setSortBy('date-desc');
     setCustomDateFrom(undefined);
     setCustomDateTo(undefined);
+  };
+
+  const getSortLabel = (sort: SortOption): string => {
+    switch (sort) {
+      case 'date-desc': return 'Newest First';
+      case 'date-asc': return 'Oldest First';
+      case 'unread': return 'Most Unread';
+      case 'name-asc': return 'Name A-Z';
+      case 'name-desc': return 'Name Z-A';
+    }
   };
 
   return (
@@ -93,7 +142,7 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
             <div>
               <h2 className="font-bold text-lg">Conversations</h2>
               <p className="text-xs text-muted-foreground">
-                {filteredContacts.length} of {contacts.length} chats
+                {filteredAndSortedContacts.length} of {contacts.length} chats
               </p>
             </div>
           </div>
@@ -218,6 +267,51 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
                 ))}
               </div>
             </div>
+
+            {/* Sort Options */}
+            <div className="pt-3 border-t border-border/30">
+              <label className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+                <ArrowUpDown className="w-3 h-3" />
+                Sort By
+              </label>
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                <SelectTrigger className="h-8 text-xs bg-secondary/50 border-border/50 rounded-lg">
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date-desc">
+                    <span className="flex items-center gap-2">
+                      <ArrowDown className="w-3 h-3" />
+                      Newest First
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="date-asc">
+                    <span className="flex items-center gap-2">
+                      <ArrowUp className="w-3 h-3" />
+                      Oldest First
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="unread">
+                    <span className="flex items-center gap-2">
+                      <Mail className="w-3 h-3" />
+                      Most Unread
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="name-asc">
+                    <span className="flex items-center gap-2">
+                      <ArrowUp className="w-3 h-3" />
+                      Name A-Z
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="name-desc">
+                    <span className="flex items-center gap-2">
+                      <ArrowDown className="w-3 h-3" />
+                      Name Z-A
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
 
@@ -276,7 +370,7 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
           </div>
         )}
 
-        {!isLoading && !error && filteredContacts.length === 0 && (
+        {!isLoading && !error && filteredAndSortedContacts.length === 0 && (
           <div className="p-8 text-center">
             <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
               <MessageCircle className="w-8 h-8 text-muted-foreground/40" />
@@ -309,7 +403,7 @@ export function ChatList({ selectedId, onSelect }: ChatListProps) {
         )}
 
         <div className="py-2">
-          {filteredContacts.map((contact, i) => {
+          {filteredAndSortedContacts.map((contact, i) => {
             const isSelected = selectedId === contact.id;
             const initials = contact.name.slice(0, 2).toUpperCase();
             
