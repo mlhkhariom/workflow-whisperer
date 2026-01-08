@@ -61,8 +61,9 @@ function parsePriceToNumber(value: unknown): number | null {
 }
 
 function computeStatus(stock: number | null | undefined): 'active' | 'low_stock' | 'out_of_stock' {
+  if (stock === null || stock === undefined) return 'active'; // No stock info = assume active
   if (stock === 0) return 'out_of_stock';
-  if (stock != null && stock > 0 && stock <= 3) return 'low_stock';
+  if (stock <= 3) return 'low_stock';
   return 'active';
 }
 

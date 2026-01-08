@@ -188,29 +188,48 @@ export function ProductsPanel() {
       }
     });
 
+  const statsData = {
+    total: products.length,
+    active: products.filter(p => p.status === "active").length,
+    lowStock: products.filter(p => p.status === "low_stock").length,
+    outOfStock: products.filter(p => p.status === "out_of_stock").length,
+  };
+
   const stats = [
     { 
       label: "Total", 
-      value: products.length, 
+      value: statsData.total, 
       icon: Package,
       color: "text-primary",
       bg: "bg-primary/10 border-primary/20",
+      activeBg: "ring-primary",
       filter: "all" as StatusFilter
     },
     { 
+      label: "In Stock", 
+      value: statsData.active, 
+      icon: Package,
+      color: "text-success",
+      bg: "bg-success/10 border-success/20",
+      activeBg: "ring-success",
+      filter: "active" as StatusFilter
+    },
+    { 
       label: "Low Stock", 
-      value: products.filter(p => p.status === "low_stock").length, 
+      value: statsData.lowStock, 
       icon: AlertTriangle,
       color: "text-warning",
       bg: "bg-warning/10 border-warning/20",
+      activeBg: "ring-warning",
       filter: "low_stock" as StatusFilter
     },
     { 
       label: "Out", 
-      value: products.filter(p => p.status === "out_of_stock").length, 
+      value: statsData.outOfStock, 
       icon: XCircle,
       color: "text-destructive",
       bg: "bg-destructive/10 border-destructive/20",
+      activeBg: "ring-destructive",
       filter: "out_of_stock" as StatusFilter
     },
   ];
@@ -343,29 +362,30 @@ export function ProductsPanel() {
       </div>
 
       {/* Stats Cards - Horizontal scrollable on mobile */}
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3">
-        {stats.map((stat, i) => (
-          <button 
-            key={stat.label}
-            className={cn(
-              "glass-card p-3 sm:p-4 lg:p-5 flex items-center gap-3 min-w-[140px] sm:min-w-0 animate-slide-up border cursor-pointer transition-all hover:scale-[1.02] shrink-0 sm:shrink",
-              stat.bg,
-              statusFilter === stat.filter && stat.filter !== "all" && "ring-2 ring-offset-2 ring-offset-background",
-              statusFilter === "low_stock" && stat.filter === "low_stock" && "ring-warning",
-              statusFilter === "out_of_stock" && stat.filter === "out_of_stock" && "ring-destructive"
-            )}
-            style={{ animationDelay: `${i * 100}ms` }}
-            onClick={() => setStatusFilter(statusFilter === stat.filter ? "all" : stat.filter)}
-          >
-            <div className={cn("p-2 sm:p-3 rounded-xl bg-card/50", stat.color)}>
-              <stat.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-            <div className="text-left">
-              <p className={cn("text-xl sm:text-2xl lg:text-3xl font-bold", stat.color)}>{stat.value}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">{stat.label}</p>
-            </div>
-          </button>
-        ))}
+      <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4">
+        {stats.map((stat, i) => {
+          const isActive = statusFilter === stat.filter;
+          return (
+            <button 
+              key={stat.label}
+              className={cn(
+                "glass-card p-3 sm:p-4 flex items-center gap-3 min-w-[110px] sm:min-w-0 animate-slide-up border cursor-pointer transition-all hover:scale-[1.02] shrink-0 sm:shrink",
+                stat.bg,
+                isActive && `ring-2 ring-offset-2 ring-offset-background ${stat.activeBg}`
+              )}
+              style={{ animationDelay: `${i * 80}ms` }}
+              onClick={() => setStatusFilter(isActive && stat.filter !== 'all' ? 'all' : stat.filter)}
+            >
+              <div className={cn("p-2 rounded-xl bg-card/50", stat.color)}>
+                <stat.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <div className="text-left">
+                <p className={cn("text-xl sm:text-2xl font-bold", stat.color)}>{stat.value}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">{stat.label}</p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Search & Filters */}
@@ -490,11 +510,20 @@ export function ProductsPanel() {
 
       {/* Active Filters */}
       {(statusFilter !== 'all' || categoryFilter !== 'all') && (
-        <div className="flex flex-wrap gap-2 animate-fade-in">
+        <div className="flex flex-wrap items-center gap-2 animate-fade-in">
+          <span className="text-xs text-muted-foreground">Filters:</span>
           {statusFilter !== 'all' && (
-            <Badge variant="secondary" className="bg-primary/10 text-primary border border-primary/20">
-              {statusConfig[statusFilter]?.label}
-              <button onClick={() => setStatusFilter('all')} className="ml-2 hover:text-primary-foreground">
+            <Badge 
+              variant="secondary" 
+              className={cn(
+                "border cursor-pointer",
+                statusFilter === 'active' && "bg-success/10 text-success border-success/30",
+                statusFilter === 'low_stock' && "bg-warning/10 text-warning border-warning/30",
+                statusFilter === 'out_of_stock' && "bg-destructive/10 text-destructive border-destructive/30"
+              )}
+            >
+              {statusConfig[statusFilter]?.label || 'In Stock'}
+              <button onClick={() => setStatusFilter('all')} className="ml-2 opacity-60 hover:opacity-100">
                 <X className="w-3 h-3" />
               </button>
             </Badge>
@@ -502,11 +531,19 @@ export function ProductsPanel() {
           {categoryFilter !== 'all' && (
             <Badge variant="secondary" className="bg-primary/10 text-primary border border-primary/20 capitalize">
               {categoryFilter}
-              <button onClick={() => setCategoryFilter('all')} className="ml-2 hover:text-primary-foreground">
+              <button onClick={() => setCategoryFilter('all')} className="ml-2 opacity-60 hover:opacity-100">
                 <X className="w-3 h-3" />
               </button>
             </Badge>
           )}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => { setStatusFilter('all'); setCategoryFilter('all'); }}
+          >
+            Clear all
+          </Button>
         </div>
       )}
 
