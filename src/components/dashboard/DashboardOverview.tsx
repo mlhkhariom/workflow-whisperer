@@ -1,84 +1,195 @@
-import { MessageSquare, Users, Package, TrendingUp } from "lucide-react";
+import { MessageSquare, Users, Package, TrendingUp, Activity, Clock, ArrowUpRight } from "lucide-react";
 import { StatsCard } from "./StatsCard";
+import { useProducts } from "@/hooks/useN8nData";
+import { useChats } from "@/hooks/useN8nData";
 
 export function DashboardOverview() {
+  const { data: products = [] } = useProducts();
+  const { data: contacts = [] } = useChats();
+
+  const totalProducts = products.length;
+  const lowStockCount = products.filter(p => p.status === "low_stock").length;
+  const totalConversations = contacts.length;
+
   return (
-    <div className="p-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Overview of your AI sales agent activity</p>
+    <div className="p-8 space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">
+            Welcome back<span className="text-gradient">!</span>
+          </h1>
+          <p className="text-muted-foreground mt-2 text-lg">
+            Here's what's happening with your AI sales agent
+          </p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-success/10 border border-success/20">
+          <Activity className="w-4 h-4 text-success" />
+          <span className="text-sm font-medium text-success">All systems operational</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatsCard
           title="Total Conversations"
-          value={156}
-          change="+12% from last week"
+          value={totalConversations}
+          change="Live from n8n"
           icon={MessageSquare}
           variant="primary"
+          trend="neutral"
         />
         <StatsCard
-          title="Active Users"
-          value={48}
-          change="+5 new today"
+          title="Active Contacts"
+          value={contacts.filter(c => c.unread > 0).length}
+          change="With unread messages"
           icon={Users}
-          variant="success"
+          variant="accent"
+          trend="up"
         />
         <StatsCard
-          title="Products Shown"
-          value={342}
-          change="+28% conversion"
+          title="Total Products"
+          value={totalProducts}
+          change={`${lowStockCount} low stock`}
           icon={Package}
-          variant="accent"
+          variant="success"
+          trend={lowStockCount > 0 ? "down" : "up"}
         />
         <StatsCard
           title="Response Rate"
           value="94%"
           change="Avg 2.3s response"
           icon={TrendingUp}
-          variant="primary"
+          variant="warning"
+          trend="up"
         />
       </div>
 
+      {/* Activity Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="glass-panel rounded-xl p-6">
-          <h3 className="font-semibold text-lg mb-4">Recent Activity</h3>
-          <div className="space-y-4">
-            {[
-              { user: "User #1234", action: "Asked about Gaming Laptops", time: "2 min ago" },
-              { user: "User #5678", action: "Purchased Desktop PC", time: "15 min ago" },
-              { user: "User #9012", action: "Viewed Accessories", time: "32 min ago" },
-              { user: "User #3456", action: "Started new conversation", time: "1 hour ago" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
-                <div>
-                  <p className="font-medium text-sm">{item.user}</p>
-                  <p className="text-xs text-muted-foreground">{item.action}</p>
+        {/* Recent Activity */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Recent Activity
+            </h3>
+            <button className="text-sm text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
+              View all <ArrowUpRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {contacts.slice(0, 5).map((contact, i) => (
+              <div 
+                key={contact.id} 
+                className="flex items-center justify-between py-4 px-4 -mx-4 hover:bg-secondary/30 rounded-xl transition-colors cursor-pointer group"
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-primary">
+                      {contact.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm group-hover:text-primary transition-colors">
+                      {contact.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                      {contact.lastMessage}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs text-muted-foreground">{item.time}</span>
+                <span className="text-xs text-muted-foreground bg-secondary/50 px-2 py-1 rounded-full">
+                  {contact.time}
+                </span>
               </div>
             ))}
+            {contacts.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No conversations yet</p>
+                <p className="text-xs mt-1">Chats will appear here from n8n</p>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="glass-panel rounded-xl p-6">
-          <h3 className="font-semibold text-lg mb-4">Top Products</h3>
-          <div className="space-y-4">
-            {[
-              { name: "Gaming Laptop Pro X", category: "Laptops", views: 89, color: "bg-primary" },
-              { name: "Workstation Desktop", category: "Desktops", views: 67, color: "bg-accent" },
-              { name: "Mechanical Keyboard", category: "Accessories", views: 54, color: "bg-success" },
-              { name: "4K Gaming Monitor", category: "Accessories", views: 43, color: "bg-primary" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <div className={`w-2 h-12 rounded-full ${item.color}`} />
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.category}</p>
+        {/* Top Products */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Package className="w-5 h-5 text-accent" />
+              Product Inventory
+            </h3>
+            <button className="text-sm text-accent hover:text-accent/80 transition-colors flex items-center gap-1">
+              View all <ArrowUpRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {products.slice(0, 5).map((product, i) => {
+              const categoryColors = {
+                laptops: "from-primary to-primary/50",
+                desktops: "from-accent to-accent/50",
+                accessories: "from-success to-success/50",
+              };
+              const color = categoryColors[product.category as keyof typeof categoryColors] || categoryColors.laptops;
+              
+              return (
+                <div 
+                  key={product.id}
+                  className="flex items-center gap-4 py-4 px-4 -mx-4 hover:bg-secondary/30 rounded-xl transition-colors cursor-pointer group"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  <div className={`w-1.5 h-12 rounded-full bg-gradient-to-b ${color}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate group-hover:text-accent transition-colors">
+                      {product.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">{product.category}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono font-medium">
+                      {product.price ? `₹${product.price.toLocaleString()}` : '—'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Stock: {product.stock ?? '—'}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-sm font-mono text-muted-foreground">{item.views} views</span>
+              );
+            })}
+            {products.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No products loaded</p>
+                <p className="text-xs mt-1">Products will appear here from n8n</p>
               </div>
-            ))}
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Stats Bar */}
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <div>
+              <p className="text-2xl font-bold text-gradient">{totalProducts}</p>
+              <p className="text-xs text-muted-foreground">Products in catalog</p>
+            </div>
+            <div className="w-px h-10 bg-border" />
+            <div>
+              <p className="text-2xl font-bold text-gradient">{totalConversations}</p>
+              <p className="text-xs text-muted-foreground">Total conversations</p>
+            </div>
+            <div className="w-px h-10 bg-border" />
+            <div>
+              <p className="text-2xl font-bold text-gradient">{lowStockCount}</p>
+              <p className="text-xs text-muted-foreground">Low stock alerts</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            Syncing with n8n
           </div>
         </div>
       </div>
