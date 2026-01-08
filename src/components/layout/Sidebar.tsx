@@ -1,4 +1,4 @@
-import { MessageSquare, Package, Radio, LayoutDashboard, Settings, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { MessageSquare, Package, Radio, LayoutDashboard, Settings, Zap, ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -11,6 +11,7 @@ const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "chats", label: "Conversations", icon: MessageSquare },
   { id: "products", label: "Products", icon: Package },
+  { id: "images", label: "Product Images", icon: ImageIcon },
   { id: "live", label: "Live Chat", icon: Radio },
 ];
 

@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { ConversationsPanel } from "@/components/chat/ConversationsPanel";
 import { ProductsPanel } from "@/components/products/ProductsPanel";
+import { ProductImagesPanel } from "@/components/images/ProductImagesPanel";
 import { LiveChatPanel } from "@/components/live/LiveChatPanel";
 import { Heart } from "lucide-react";
 
@@ -17,6 +18,8 @@ const Index = () => {
         return <ConversationsPanel />;
       case "products":
         return <ProductsPanel />;
+      case "images":
+        return <ProductImagesPanel />;
       case "live":
         return <LiveChatPanel />;
       default:
