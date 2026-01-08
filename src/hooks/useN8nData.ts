@@ -1,18 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-interface N8nResponse<T> {
-  data?: T;
-  error?: string;
-}
-
-async function callN8n<T>(action: string, data?: unknown): Promise<T> {
+async function callApi<T>(action: string, data?: unknown): Promise<T> {
   const { data: response, error } = await supabase.functions.invoke('postgres-api', {
     body: { action, data },
   });
 
   if (error) {
-    console.error('Supabase function error:', error);
+    console.error('API error:', error);
     throw new Error(error.message);
   }
 
@@ -23,95 +18,138 @@ async function callN8n<T>(action: string, data?: unknown): Promise<T> {
   return response;
 }
 
-// Products
+// ==================== PRODUCT INTERFACES ====================
+
 export interface Product {
   id: string;
-  name: string;
-  category: 'laptops' | 'desktops' | 'accessories' | string;
+  category: 'laptops' | 'desktops' | 'accessories';
+  // Common fields
+  brand?: string;
+  model?: string;
+  name?: string; // For accessories
+  processor?: string;
+  generation?: string;
+  ram_gb?: number | null;
+  ram_type?: string;
+  storage_type?: string;
+  storage_gb?: number | null;
+  screen_size?: string;
+  monitor_size?: string;
+  graphics?: string;
+  condition?: string;
+  price_range?: string;
+  stock_quantity?: number | null;
+  special_feature?: string;
+  warranty_in_months?: number | null;
+  image_url_1?: string | null;
+  image_url_2?: string | null;
+  updated_at?: string;
+  // Computed
+  status: 'active' | 'low_stock' | 'out_of_stock';
+  displayName: string;
   price: number | null;
-  stock: number | null;
-  status: 'active' | 'low_stock' | 'out_of_stock' | string;
-  imageUrl?: string | null;
 }
 
 function parsePriceToNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value !== 'string') return null;
-
-  // Extract the first number-like chunk (handles: "15000-22000", "₹2,000 – ₹6,500", "1826")
   const cleaned = value.replace(/,/g, '');
   const match = cleaned.match(/\d+(?:\.\d+)?/);
   if (!match) return null;
-
   const num = Number(match[0]);
   return Number.isFinite(num) ? num : null;
 }
 
-function computeStatus(stock: number | null): 'active' | 'low_stock' | 'out_of_stock' {
+function computeStatus(stock: number | null | undefined): 'active' | 'low_stock' | 'out_of_stock' {
   if (stock === 0) return 'out_of_stock';
   if (stock != null && stock > 0 && stock <= 3) return 'low_stock';
   return 'active';
 }
 
 function normalizeLaptop(raw: any): Product {
-  const id = raw?.id ?? `laptop-${raw?.row_number ?? crypto.randomUUID()}`;
-  const name = `${raw?.brand ?? ''} ${raw?.model ?? ''}`.trim() || `Laptop ${raw?.row_number ?? ''}`.trim();
-  const stock = typeof raw?.stock_quantity === 'number' ? raw.stock_quantity : null;
-  const price = parsePriceToNumber(raw?.price_range);
-
+  const id = String(raw?.row_number ?? crypto.randomUUID());
+  const displayName = `${raw?.brand ?? ''} ${raw?.model ?? ''}`.trim() || `Laptop ${id}`;
+  
   return {
-    id: String(id),
-    name,
+    id,
     category: 'laptops',
-    price,
-    stock,
-    status: computeStatus(stock),
-    imageUrl: raw?.image_url_1 ?? null,
-  };
-}
-
-function normalizeAccessory(raw: any): Product {
-  const id = raw?.id ?? `accessory-${raw?.row_number ?? crypto.randomUUID()}`;
-  const name = String(raw?.accessories_name ?? raw?.name ?? 'Accessory');
-  const price = parsePriceToNumber(raw?.price_range_inr ?? raw?.price_range ?? raw?.price);
-
-  // Accessories table does not have stock — keep it null so UI shows “—”
-  const stock: number | null = null;
-
-  return {
-    id: String(id),
-    name,
-    category: 'accessories',
-    price,
-    stock,
-    status: 'active',
-    imageUrl: raw?.image_url_1 ?? null,
+    brand: raw?.brand || '',
+    model: raw?.model || '',
+    processor: raw?.processor || '',
+    generation: raw?.generation || '',
+    ram_gb: raw?.ram_gb ?? null,
+    storage_type: raw?.storage_type || '',
+    storage_gb: raw?.storage_gb ?? null,
+    screen_size: raw?.screen_size || '',
+    graphics: raw?.graphics || '',
+    condition: raw?.condition || 'Used',
+    price_range: raw?.price_range || '',
+    stock_quantity: raw?.stock_quantity ?? null,
+    special_feature: raw?.special_feature || '',
+    warranty_in_months: raw?.warranty_in_months ?? null,
+    image_url_1: raw?.image_url_1 || null,
+    image_url_2: raw?.image_url_2 || null,
+    updated_at: raw?.updated_at || null,
+    status: computeStatus(raw?.stock_quantity),
+    displayName,
+    price: parsePriceToNumber(raw?.price_range),
   };
 }
 
 function normalizeDesktop(raw: any): Product {
-  const id = raw?.id ?? `desktop-${raw?.row_number ?? crypto.randomUUID()}`;
-  const name = String(raw?.name ?? raw?.desktop_name ?? 'Desktop');
-  const stock = typeof raw?.stock_quantity === 'number' ? raw.stock_quantity : (typeof raw?.stock === 'number' ? raw.stock : null);
-  const price = parsePriceToNumber(raw?.price_range ?? raw?.price);
-
+  const id = String(raw?.row_number ?? crypto.randomUUID());
+  const displayName = `${raw?.brand ?? ''} ${raw?.model ?? ''}`.trim() || `Desktop ${id}`;
+  
   return {
-    id: String(id),
-    name,
+    id,
     category: 'desktops',
-    price,
-    stock,
-    status: computeStatus(stock),
-    imageUrl: raw?.image_url_1 ?? null,
+    brand: raw?.brand || '',
+    model: raw?.model || '',
+    processor: raw?.processor || '',
+    generation: raw?.generation || '',
+    ram_gb: raw?.ram_gb ?? null,
+    ram_type: raw?.ram_type || '',
+    storage_gb: raw?.storage_gb ?? null,
+    monitor_size: raw?.monitor_size || '',
+    graphics: raw?.graphics || '',
+    condition: raw?.condition || 'Used',
+    price_range: raw?.price_range || '',
+    stock_quantity: raw?.stock_quantity ?? null,
+    special_feature: raw?.special_feature || '',
+    warranty_in_months: raw?.warranty_in_months ?? null,
+    image_url_1: raw?.image_url_1 || null,
+    image_url_2: raw?.image_url_2 || null,
+    updated_at: raw?.updated_at || null,
+    status: computeStatus(raw?.stock_quantity),
+    displayName,
+    price: parsePriceToNumber(raw?.price_range),
   };
 }
 
-// Fetch all product categories and combine them
+function normalizeAccessory(raw: any): Product {
+  const id = String(raw?.row_number ?? crypto.randomUUID());
+  const displayName = raw?.accessories_name || `Accessory ${id}`;
+  
+  return {
+    id,
+    category: 'accessories',
+    name: raw?.accessories_name || '',
+    price_range: raw?.price_range_inr || '',
+    image_url_1: raw?.image_url_1 || null,
+    image_url_2: raw?.image_url_2 || null,
+    updated_at: raw?.updated_at || null,
+    status: 'active',
+    displayName,
+    price: parsePriceToNumber(raw?.price_range_inr),
+    stock_quantity: null,
+  };
+}
+
 async function fetchAllProducts(): Promise<Product[]> {
   const [laptopsRaw, desktopsRaw, accessoriesRaw] = await Promise.all([
-    callN8n<any[]>('get-laptop').catch(() => []),
-    callN8n<any[]>('get-desktops').catch(() => []),
-    callN8n<any[]>('get-accessories').catch(() => []),
+    callApi<any[]>('get-laptop').catch(() => []),
+    callApi<any[]>('get-desktops').catch(() => []),
+    callApi<any[]>('get-accessories').catch(() => []),
   ]);
 
   const laptops = (laptopsRaw || []).map(normalizeLaptop);
@@ -131,43 +169,14 @@ export function useProducts() {
   });
 }
 
-// Get action name based on category
-function getUpdateAction(category: string): string {
-  switch (category.toLowerCase()) {
-    case 'laptops':
-      return 'update-laptop';
-    case 'desktops':
-      return 'update-desktop';
-    case 'accessories':
-      return 'update-accessory';
-    default:
-      return 'update-product';
-  }
-}
+// ==================== PRODUCT MUTATIONS ====================
 
-function getDeleteAction(category: string): string {
+function getActionPrefix(category: string): string {
   switch (category.toLowerCase()) {
-    case 'laptops':
-      return 'delete-laptop';
-    case 'desktops':
-      return 'delete-desktop';
-    case 'accessories':
-      return 'delete-accessory';
-    default:
-      return 'delete-product';
-  }
-}
-
-function getAddAction(category: string): string {
-  switch (category.toLowerCase()) {
-    case 'laptops':
-      return 'add-laptop';
-    case 'desktops':
-      return 'add-desktop';
-    case 'accessories':
-      return 'add-accessory';
-    default:
-      return 'add-product';
+    case 'laptops': return 'laptop';
+    case 'desktops': return 'desktop';
+    case 'accessories': return 'accessory';
+    default: return 'product';
   }
 }
 
@@ -175,9 +184,10 @@ export function useAddProduct() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (product: Omit<Product, 'id'>) => {
-      const action = getAddAction(product.category);
-      return callN8n(action, product);
+    mutationFn: (product: Partial<Product>) => {
+      const action = `add-${getActionPrefix(product.category || '')}`;
+      console.log('Adding product:', action, product);
+      return callApi(action, product);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -190,9 +200,9 @@ export function useUpdateProduct() {
   
   return useMutation({
     mutationFn: (product: Product) => {
-      const action = getUpdateAction(product.category);
-      console.log('Updating product with action:', action, product);
-      return callN8n(action, product);
+      const action = `update-${getActionPrefix(product.category)}`;
+      console.log('Updating product:', action, product);
+      return callApi(action, product);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -205,9 +215,9 @@ export function useDeleteProduct() {
   
   return useMutation({
     mutationFn: ({ id, category }: { id: string; category: string }) => {
-      const action = getDeleteAction(category);
-      console.log('Deleting product with action:', action, { id, category });
-      return callN8n(action, { id });
+      const action = `delete-${getActionPrefix(category)}`;
+      console.log('Deleting product:', action, { id });
+      return callApi(action, { id });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -215,30 +225,20 @@ export function useDeleteProduct() {
   });
 }
 
-// Chats - Raw message from n8n (supports both old and new field names)
-interface RawChatMessageFromApi {
+// ==================== CHAT INTERFACES ====================
+
+interface RawChatMessage {
   id?: number;
-  // New field names
-  contactUid?: string;
-  firstName?: string;
-  phoneNumber?: string;
-  phoneNumberId?: string;
-  messageText?: string;
-  // Old field names (fallback)
   contact_uid?: string;
   content?: string;
-  // Common fields
   role?: 'user' | 'assistant';
   created_at?: string;
 }
 
-// Normalized internal format
-interface NormalizedRawMessage {
-  id: number | string;
+interface NormalizedMessage {
+  id: string;
   contactUid: string;
-  firstName?: string;
-  phoneNumber?: string;
-  messageText: string;
+  content: string;
   role: 'user' | 'assistant';
   created_at: string;
 }
@@ -261,17 +261,13 @@ export interface ChatContact {
   online: boolean;
 }
 
-// Normalize raw API message to consistent format
-function normalizeRawMessage(raw: RawChatMessageFromApi): NormalizedRawMessage | null {
-  const contactUid = raw.contactUid || raw.contact_uid;
-  if (!contactUid) return null;
+function normalizeRawMessage(raw: RawChatMessage): NormalizedMessage | null {
+  if (!raw.contact_uid) return null;
   
   return {
-    id: raw.id ?? crypto.randomUUID(),
-    contactUid,
-    firstName: raw.firstName,
-    phoneNumber: raw.phoneNumber,
-    messageText: raw.messageText || raw.content || '',
+    id: String(raw.id ?? crypto.randomUUID()),
+    contactUid: raw.contact_uid,
+    content: raw.content || '',
     role: raw.role || 'user',
     created_at: raw.created_at || new Date().toISOString(),
   };
@@ -293,79 +289,64 @@ function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-// Derive contacts list from all messages
-function deriveContactsFromMessages(messages: NormalizedRawMessage[]): ChatContact[] {
-  const contactMap = new Map<string, { messages: NormalizedRawMessage[]; firstName?: string; phoneNumber?: string }>();
+function deriveContactsFromMessages(messages: NormalizedMessage[]): ChatContact[] {
+  const contactMap = new Map<string, NormalizedMessage[]>();
 
   for (const msg of messages) {
-    const contactId = msg.contactUid;
-    if (!contactId) continue;
-    
-    if (!contactMap.has(contactId)) {
-      contactMap.set(contactId, { messages: [], firstName: msg.firstName, phoneNumber: msg.phoneNumber });
+    if (!msg.contactUid) continue;
+    if (!contactMap.has(msg.contactUid)) {
+      contactMap.set(msg.contactUid, []);
     }
-    const entry = contactMap.get(contactId)!;
-    entry.messages.push(msg);
-    // Update name/phone if available
-    if (msg.firstName) entry.firstName = msg.firstName;
-    if (msg.phoneNumber) entry.phoneNumber = msg.phoneNumber;
+    contactMap.get(msg.contactUid)!.push(msg);
   }
 
   const contacts: ChatContact[] = [];
 
-  for (const [contactId, data] of contactMap.entries()) {
-    // Sort messages by created_at descending to get latest
-    const sorted = data.messages.sort(
-      (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
+  for (const [contactId, msgs] of contactMap.entries()) {
+    const sorted = msgs.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
     const lastMsg = sorted[0];
     const unreadCount = sorted.filter(m => m.role === 'user').length;
 
     contacts.push({
       id: contactId,
-      name: data.firstName || `Contact ${contactId.slice(0, 8)}`,
-      phoneNumber: data.phoneNumber || '',
-      lastMessage: lastMsg?.messageText ?? '',
+      name: `Contact ${contactId.slice(0, 8)}`,
+      phoneNumber: '',
+      lastMessage: lastMsg?.content ?? '',
       time: lastMsg?.created_at ? formatRelativeTime(lastMsg.created_at) : '',
       unread: Math.min(unreadCount, 9),
       online: false,
     });
   }
 
-  // Sort contacts by most recent message
   contacts.sort((a, b) => {
-    const aTime = contactMap.get(a.id)?.messages[0]?.created_at ?? '';
-    const bTime = contactMap.get(b.id)?.messages[0]?.created_at ?? '';
+    const aTime = contactMap.get(a.id)?.[0]?.created_at ?? '';
+    const bTime = contactMap.get(b.id)?.[0]?.created_at ?? '';
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
   return contacts;
 }
 
-// Normalize raw message to our ChatMessage format
-function normalizeToChatMessage(raw: NormalizedRawMessage): ChatMessage {
+function normalizeToChatMessage(raw: NormalizedMessage): ChatMessage {
   return {
-    id: String(raw.id),
+    id: raw.id,
     contactId: raw.contactUid,
-    message: raw.messageText,
+    message: raw.content,
     sender: raw.role === 'assistant' ? 'agent' : 'user',
     timestamp: raw.created_at,
   };
 }
 
-// Store all messages globally for both contacts list and individual chat
-let cachedNormalizedMessages: NormalizedRawMessage[] = [];
-
-async function fetchAllMessages(): Promise<NormalizedRawMessage[]> {
-  const rawMessages = await callN8n<RawChatMessageFromApi[]>('get-chats');
-  console.log('Raw messages from n8n:', rawMessages);
+async function fetchAllMessages(): Promise<NormalizedMessage[]> {
+  const rawMessages = await callApi<RawChatMessage[]>('get-chats');
+  console.log('Raw chat messages:', rawMessages);
   const normalized = (rawMessages || [])
     .map(normalizeRawMessage)
-    .filter((m): m is NormalizedRawMessage => m !== null);
+    .filter((m): m is NormalizedMessage => m !== null);
   console.log('Normalized messages:', normalized);
-  console.log('Derived contacts:', deriveContactsFromMessages(normalized));
-  cachedNormalizedMessages = normalized;
-  return cachedNormalizedMessages;
+  return normalized;
 }
 
 export function useChats() {
@@ -380,7 +361,7 @@ export function useChats() {
 }
 
 export function useChatMessages(contactId: string | null) {
-  return useQuery<NormalizedRawMessage[], Error, ChatMessage[]>({
+  return useQuery<NormalizedMessage[], Error, ChatMessage[]>({
     queryKey: ['all-messages'],
     queryFn: fetchAllMessages,
     staleTime: 5_000,
@@ -391,7 +372,7 @@ export function useChatMessages(contactId: string | null) {
       if (!contactId) return [];
       return messages
         .filter(m => m.contactUid === contactId)
-        .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime())
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .map(normalizeToChatMessage);
     },
   });
@@ -402,7 +383,7 @@ export function useSendMessage() {
   
   return useMutation({
     mutationFn: ({ contactId, message }: { contactId: string; message: string }) => 
-      callN8n('send-message', { contactId, message }),
+      callApi('send-message', { contactId, message }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-messages'] });
     },

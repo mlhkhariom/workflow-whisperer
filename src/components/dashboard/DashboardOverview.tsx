@@ -152,7 +152,7 @@ export function DashboardOverview() {
                       {product.price ? `₹${product.price.toLocaleString()}` : '—'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Stock: {product.stock ?? '—'}
+                      Stock: {product.stock_quantity ?? '—'}
                     </p>
                   </div>
                 </div>
