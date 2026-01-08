@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Upload, Image, Loader2, Copy, Check, Trash2, Search, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Upload, Image, Loader2, Copy, Check, Trash2, Search, RefreshCw, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -20,6 +22,9 @@ export function ProductImagesPanel() {
   const [dragOver, setDragOver] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; image: StorageImage | null }>({ open: false, image: null });
+  const [newFileName, setNewFileName] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchImages = async () => {
@@ -131,6 +136,74 @@ export function ProductImagesPanel() {
       setTimeout(() => setCopiedUrl(null), 2000);
     } catch {
       toast.error('Failed to copy URL');
+    }
+  };
+
+  const openRenameDialog = (image: StorageImage) => {
+    const nameWithoutExt = image.name.replace(/\.(jpg|jpeg)$/i, '');
+    setNewFileName(nameWithoutExt);
+    setRenameDialog({ open: true, image });
+  };
+
+  const handleRename = async () => {
+    if (!renameDialog.image || !newFileName.trim()) return;
+
+    const sanitizedName = newFileName
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    if (!sanitizedName) {
+      toast.error('Please enter a valid filename');
+      return;
+    }
+
+    const newFullName = `${sanitizedName}.jpg`;
+    
+    if (newFullName === renameDialog.image.name) {
+      setRenameDialog({ open: false, image: null });
+      return;
+    }
+
+    setRenaming(true);
+    try {
+      // Download the existing file
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('product-images')
+        .download(`products/${renameDialog.image.name}`);
+
+      if (downloadError) throw downloadError;
+
+      // Upload with new name
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(`products/${newFullName}`, fileData, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        if (uploadError.message.includes('already exists')) {
+          toast.error('A file with this name already exists');
+          return;
+        }
+        throw uploadError;
+      }
+
+      // Delete old file
+      await supabase.storage
+        .from('product-images')
+        .remove([`products/${renameDialog.image.name}`]);
+
+      toast.success('Image renamed successfully');
+      setRenameDialog({ open: false, image: null });
+      fetchImages();
+    } catch (error: any) {
+      console.error('Rename error:', error);
+      toast.error(error.message || 'Failed to rename image');
+    } finally {
+      setRenaming(false);
     }
   };
 
@@ -267,6 +340,15 @@ export function ProductImagesPanel() {
                       </Button>
                       <Button
                         size="sm"
+                        variant="secondary"
+                        className="w-full text-xs"
+                        onClick={() => openRenameDialog(image)}
+                      >
+                        <Pencil className="w-3 h-3 mr-1" />
+                        Rename
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="destructive"
                         className="w-full text-xs"
                         onClick={() => handleDelete(image.name)}
@@ -306,6 +388,75 @@ export function ProductImagesPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialog.open} onOpenChange={(open) => !renaming && setRenameDialog({ open, image: open ? renameDialog.image : null })}>
+        <DialogContent className="sm:max-w-[425px] glass-card border-border/50">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-primary" />
+              Rename Image
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {renameDialog.image && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                <img 
+                  src={renameDialog.image.url} 
+                  alt="Preview"
+                  className="w-12 h-12 rounded-lg object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Current name:</p>
+                  <p className="text-sm font-medium truncate">{renameDialog.image.name}</p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="newFileName">New filename</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="newFileName"
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  placeholder="Enter new filename"
+                  className="bg-secondary/30 border-border/50"
+                  onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                />
+                <span className="text-sm text-muted-foreground">.jpg</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Only letters, numbers, hyphens and underscores allowed
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setRenameDialog({ open: false, image: null })}
+              disabled={renaming}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRename}
+              disabled={renaming || !newFileName.trim()}
+            >
+              {renaming ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Renaming...
+                </>
+              ) : (
+                <>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Rename
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
