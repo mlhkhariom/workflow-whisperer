@@ -317,11 +317,11 @@ export function ProductsPanel() {
                       <TableCell>
                         <span className={cn(
                           "font-medium",
-                          product.stock === 0 && "text-destructive",
-                          product.stock && product.stock <= 3 && "text-warning",
-                          product.stock && product.stock > 3 && "text-foreground"
+                          product.stock_quantity === 0 && "text-destructive",
+                          product.stock_quantity && product.stock_quantity <= 3 && "text-warning",
+                          product.stock_quantity && product.stock_quantity > 3 && "text-foreground"
                         )}>
-                          {product.stock ?? "—"}
+                          {product.stock_quantity ?? "—"}
                         </span>
                       </TableCell>
                       <TableCell>

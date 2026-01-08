@@ -85,85 +85,142 @@ serve(async (req) => {
         console.log('Columns:', result.rows);
         return jsonResponse(result.rows);
 
-      // Products - GET (using row_number as id)
+      // ==================== LAPTOPS ====================
       case 'get-laptop':
-        result = await client.queryObject('SELECT row_number as id, * FROM laptops ORDER BY row_number');
+        result = await client.queryObject(`
+          SELECT row_number, brand, model, processor, generation, ram_gb, storage_type, storage_gb, 
+                 screen_size, graphics, condition, price_range, stock_quantity, special_feature,
+                 warranty_in_months, image_url_1, image_url_2, updated_at
+          FROM laptops ORDER BY row_number
+        `);
         return jsonResponse(result.rows);
 
-      case 'get-desktops':
-        result = await client.queryObject('SELECT row_number as id, * FROM desktops ORDER BY row_number');
-        return jsonResponse(result.rows);
-
-      case 'get-accessories':
-        result = await client.queryObject('SELECT row_number as id, * FROM accessories ORDER BY row_number');
-        return jsonResponse(result.rows);
-
-      // Products - ADD
       case 'add-laptop':
         result = await client.queryObject(
-          `INSERT INTO laptops (brand, model, price_range, stock_quantity, image_url_1) 
-           VALUES ($1, $2, $3, $4, $5) RETURNING row_number as id, *`,
-          [data?.name?.split(' ')[0] || '', data?.name?.split(' ').slice(1).join(' ') || '', String(data?.price || '0'), data?.stock || 0, data?.imageUrl || null]
+          `INSERT INTO laptops (brand, model, processor, generation, ram_gb, storage_type, storage_gb,
+                                screen_size, graphics, condition, price_range, stock_quantity, 
+                                special_feature, warranty_in_months, image_url_1, image_url_2, updated_at) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW()) 
+           RETURNING row_number, *`,
+          [
+            data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
+            data?.ram_gb || null, data?.storage_type || '', data?.storage_gb || null,
+            data?.screen_size || '', data?.graphics || '', data?.condition || 'Used',
+            data?.price_range || '', data?.stock_quantity || 0, data?.special_feature || '',
+            data?.warranty_in_months || null, data?.image_url_1 || null, data?.image_url_2 || null
+          ]
         );
         return jsonResponse(result.rows[0] || { success: true });
+
+      case 'update-laptop':
+        result = await client.queryObject(
+          `UPDATE laptops SET 
+             brand = $1, model = $2, processor = $3, generation = $4, ram_gb = $5, 
+             storage_type = $6, storage_gb = $7, screen_size = $8, graphics = $9, 
+             condition = $10, price_range = $11, stock_quantity = $12, special_feature = $13,
+             warranty_in_months = $14, image_url_1 = $15, image_url_2 = $16, updated_at = NOW()
+           WHERE row_number = $17 RETURNING row_number, *`,
+          [
+            data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
+            data?.ram_gb || null, data?.storage_type || '', data?.storage_gb || null,
+            data?.screen_size || '', data?.graphics || '', data?.condition || 'Used',
+            data?.price_range || '', data?.stock_quantity || 0, data?.special_feature || '',
+            data?.warranty_in_months || null, data?.image_url_1 || null, data?.image_url_2 || null,
+            data?.id
+          ]
+        );
+        return jsonResponse(result.rows[0] || { success: true });
+
+      case 'delete-laptop':
+        await client.queryObject('DELETE FROM laptops WHERE row_number = $1', [data?.id]);
+        return jsonResponse({ success: true });
+
+      // ==================== DESKTOPS ====================
+      case 'get-desktops':
+        result = await client.queryObject(`
+          SELECT row_number, brand, model, processor, generation, ram_gb, ram_type, storage_gb,
+                 monitor_size, graphics, condition, price_range, stock_quantity, special_feature,
+                 warranty_in_months, image_url_1, image_url_2, updated_at
+          FROM desktops ORDER BY row_number
+        `);
+        return jsonResponse(result.rows);
 
       case 'add-desktop':
         result = await client.queryObject(
-          `INSERT INTO desktops (brand, model, price_range, stock_quantity, image_url_1) 
-           VALUES ($1, $2, $3, $4, $5) RETURNING row_number as id, *`,
-          [data?.name?.split(' ')[0] || '', data?.name?.split(' ').slice(1).join(' ') || '', String(data?.price || '0'), data?.stock || 0, data?.imageUrl || null]
-        );
-        return jsonResponse(result.rows[0] || { success: true });
-
-      case 'add-accessory':
-        result = await client.queryObject(
-          `INSERT INTO accessories (accessories_name, price_range_inr, image_url_1) 
-           VALUES ($1, $2, $3) RETURNING row_number as id, *`,
-          [data?.name || '', String(data?.price || '0'), data?.imageUrl || null]
-        );
-        return jsonResponse(result.rows[0] || { success: true });
-
-      // Products - UPDATE (using row_number)
-      case 'update-laptop':
-        result = await client.queryObject(
-          `UPDATE laptops SET brand = $1, model = $2, price_range = $3, stock_quantity = $4, image_url_1 = $5 
-           WHERE row_number = $6 RETURNING row_number as id, *`,
-          [data?.name?.split(' ')[0] || '', data?.name?.split(' ').slice(1).join(' ') || '', String(data?.price || '0'), data?.stock || 0, data?.imageUrl || null, data?.id]
+          `INSERT INTO desktops (brand, model, processor, generation, ram_gb, ram_type, storage_gb,
+                                 monitor_size, graphics, condition, price_range, stock_quantity,
+                                 special_feature, warranty_in_months, image_url_1, image_url_2, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+           RETURNING row_number, *`,
+          [
+            data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
+            data?.ram_gb || null, data?.ram_type || '', data?.storage_gb || null,
+            data?.monitor_size || '', data?.graphics || '', data?.condition || 'Used',
+            data?.price_range || '', data?.stock_quantity || 0, data?.special_feature || '',
+            data?.warranty_in_months || null, data?.image_url_1 || null, data?.image_url_2 || null
+          ]
         );
         return jsonResponse(result.rows[0] || { success: true });
 
       case 'update-desktop':
         result = await client.queryObject(
-          `UPDATE desktops SET brand = $1, model = $2, price_range = $3, stock_quantity = $4, image_url_1 = $5 
-           WHERE row_number = $6 RETURNING row_number as id, *`,
-          [data?.name?.split(' ')[0] || '', data?.name?.split(' ').slice(1).join(' ') || '', String(data?.price || '0'), data?.stock || 0, data?.imageUrl || null, data?.id]
+          `UPDATE desktops SET 
+             brand = $1, model = $2, processor = $3, generation = $4, ram_gb = $5,
+             ram_type = $6, storage_gb = $7, monitor_size = $8, graphics = $9,
+             condition = $10, price_range = $11, stock_quantity = $12, special_feature = $13,
+             warranty_in_months = $14, image_url_1 = $15, image_url_2 = $16, updated_at = NOW()
+           WHERE row_number = $17 RETURNING row_number, *`,
+          [
+            data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
+            data?.ram_gb || null, data?.ram_type || '', data?.storage_gb || null,
+            data?.monitor_size || '', data?.graphics || '', data?.condition || 'Used',
+            data?.price_range || '', data?.stock_quantity || 0, data?.special_feature || '',
+            data?.warranty_in_months || null, data?.image_url_1 || null, data?.image_url_2 || null,
+            data?.id
+          ]
         );
         return jsonResponse(result.rows[0] || { success: true });
-
-      case 'update-accessory':
-        result = await client.queryObject(
-          `UPDATE accessories SET accessories_name = $1, price_range_inr = $2, image_url_1 = $3 
-           WHERE row_number = $4 RETURNING row_number as id, *`,
-          [data?.name || '', String(data?.price || '0'), data?.imageUrl || null, data?.id]
-        );
-        return jsonResponse(result.rows[0] || { success: true });
-
-      // Products - DELETE (using row_number)
-      case 'delete-laptop':
-        await client.queryObject('DELETE FROM laptops WHERE row_number = $1', [data?.id]);
-        return jsonResponse({ success: true });
 
       case 'delete-desktop':
         await client.queryObject('DELETE FROM desktops WHERE row_number = $1', [data?.id]);
         return jsonResponse({ success: true });
 
+      // ==================== ACCESSORIES ====================
+      case 'get-accessories':
+        result = await client.queryObject(`
+          SELECT row_number, accessories_name, price_range_inr, image_url_1, image_url_2, updated_at
+          FROM accessories ORDER BY row_number
+        `);
+        return jsonResponse(result.rows);
+
+      case 'add-accessory':
+        result = await client.queryObject(
+          `INSERT INTO accessories (accessories_name, price_range_inr, image_url_1, image_url_2, updated_at)
+           VALUES ($1, $2, $3, $4, NOW()) RETURNING row_number, *`,
+          [data?.name || '', data?.price_range || '', data?.image_url_1 || null, data?.image_url_2 || null]
+        );
+        return jsonResponse(result.rows[0] || { success: true });
+
+      case 'update-accessory':
+        result = await client.queryObject(
+          `UPDATE accessories SET 
+             accessories_name = $1, price_range_inr = $2, image_url_1 = $3, image_url_2 = $4, updated_at = NOW()
+           WHERE row_number = $5 RETURNING row_number, *`,
+          [data?.name || '', data?.price_range || '', data?.image_url_1 || null, data?.image_url_2 || null, data?.id]
+        );
+        return jsonResponse(result.rows[0] || { success: true });
+
       case 'delete-accessory':
         await client.queryObject('DELETE FROM accessories WHERE row_number = $1', [data?.id]);
         return jsonResponse({ success: true });
 
-      // Chats - using chat_messages table (columns: id, contact_uid, role, content, created_at)
+      // ==================== CHATS ====================
       case 'get-chats':
-        result = await client.queryObject('SELECT * FROM chat_messages ORDER BY created_at DESC');
+        result = await client.queryObject(`
+          SELECT id, contact_uid, role, content, created_at 
+          FROM chat_messages 
+          ORDER BY created_at DESC
+        `);
         return jsonResponse(result.rows);
 
       case 'send-message':
