@@ -74,6 +74,17 @@ serve(async (req) => {
         console.log('Tables found:', result.rows);
         return jsonResponse(result.rows);
 
+      // Debug - Describe table columns
+      case 'describe-table':
+        result = await client.queryObject(`
+          SELECT column_name, data_type, is_nullable 
+          FROM information_schema.columns 
+          WHERE table_name = $1
+          ORDER BY ordinal_position
+        `, [data?.table]);
+        console.log('Columns:', result.rows);
+        return jsonResponse(result.rows);
+
       // Products - GET
       case 'get-laptop':
         result = await client.queryObject('SELECT * FROM laptops ORDER BY id');
@@ -150,14 +161,14 @@ serve(async (req) => {
         await client.queryObject('DELETE FROM accessories WHERE id = $1', [data?.id]);
         return jsonResponse({ success: true });
 
-      // Chats - using chat_messages table
+      // Chats - using chat_messages table (columns: id, contact_uid, role, content, created_at)
       case 'get-chats':
-        result = await client.queryObject('SELECT * FROM chat_messages ORDER BY "createdAt" DESC');
+        result = await client.queryObject('SELECT * FROM chat_messages ORDER BY created_at DESC');
         return jsonResponse(result.rows);
 
       case 'send-message':
         result = await client.queryObject(
-          `INSERT INTO chat_messages ("contactUid", "messageText", role, "createdAt") 
+          `INSERT INTO chat_messages (contact_uid, content, role, created_at) 
            VALUES ($1, $2, 'assistant', NOW()) RETURNING *`,
           [data?.contactId, data?.message]
         );
