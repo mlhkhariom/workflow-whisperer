@@ -19,9 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useProducts, useUpdateProduct, useDeleteProduct, type Product } from "@/hooks/useN8nData";
+import { useProducts, useUpdateProduct, useDeleteProduct, useAddProduct, type Product } from "@/hooks/useN8nData";
 import { ProductEditDialog } from "./ProductEditDialog";
 import { ProductDeleteDialog } from "./ProductDeleteDialog";
+import { ProductAddDialog } from "./ProductAddDialog";
 import { toast } from "sonner";
 
 const categoryIcons: Record<string, typeof Laptop> = {
@@ -53,10 +54,12 @@ export function ProductsPanel() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
   
   const { data: products = [], isLoading, error, refetch } = useProducts();
   const updateMutation = useUpdateProduct();
   const deleteMutation = useDeleteProduct();
+  const addMutation = useAddProduct();
 
   const handleEdit = (product: Product) => {
     setEditProduct(product);
@@ -95,6 +98,19 @@ export function ProductsPanel() {
         }
       );
     }
+  };
+
+  const handleAddProduct = (newProduct: Omit<Product, 'id'>) => {
+    addMutation.mutate(newProduct, {
+      onSuccess: () => {
+        toast.success("Product added successfully!");
+        setShowAddDialog(false);
+        refetch();
+      },
+      onError: (err) => {
+        toast.error(`Failed to add product: ${err.message}`);
+      },
+    });
   };
 
   const filteredProducts = products.filter(p => {
@@ -149,7 +165,10 @@ export function ProductsPanel() {
             <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
             Refresh
           </Button>
-          <Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 glow-primary">
+          <Button 
+            className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 glow-primary"
+            onClick={() => setShowAddDialog(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add Product
           </Button>
@@ -359,6 +378,14 @@ export function ProductsPanel() {
         onOpenChange={(open) => !open && setDeleteProduct(null)}
         onConfirm={handleConfirmDelete}
         isLoading={deleteMutation.isPending}
+      />
+
+      {/* Add Dialog */}
+      <ProductAddDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onSave={handleAddProduct}
+        isLoading={addMutation.isPending}
       />
     </div>
   );
