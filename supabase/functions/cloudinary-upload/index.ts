@@ -74,17 +74,16 @@ serve(async (req) => {
     if (action === "list") {
       const { folder = "product-images" } = params;
       
-      const timestamp = Math.floor(Date.now() / 1000);
-      const signatureString = `prefix=${folder}/&timestamp=${timestamp}&type=upload${apiSecret}`;
-      const encoder = new TextEncoder();
-      const data = encoder.encode(signatureString);
-      const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const signature = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+      // Admin API requires Basic Auth, not signature
+      const authString = btoa(`${apiKey}:${apiSecret}`);
+      
+      const listUrl = `https://api.cloudinary.com/v1_1/${cloudName}/resources/image/upload?prefix=${folder}/&type=upload&max_results=500`;
 
-      const listUrl = `https://api.cloudinary.com/v1_1/${cloudName}/resources/image/upload?prefix=${folder}/&type=upload&timestamp=${timestamp}&api_key=${apiKey}&signature=${signature}`;
-
-      const listResponse = await fetch(listUrl);
+      const listResponse = await fetch(listUrl, {
+        headers: {
+          "Authorization": `Basic ${authString}`,
+        },
+      });
       const listResult = await listResponse.json();
 
       if (listResult.error) {
