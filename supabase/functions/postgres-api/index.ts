@@ -52,8 +52,12 @@ serve(async (req) => {
 
     console.log(`Processing action: ${action}`, data);
 
-    // Connect to PostgreSQL
-    client = new Client(postgresUrl);
+    // Connect to PostgreSQL with TLS disabled
+    const connectionUrl = postgresUrl.includes('?') 
+      ? `${postgresUrl}&sslmode=disable` 
+      : `${postgresUrl}?sslmode=disable`;
+    
+    client = new Client(connectionUrl);
     await client.connect();
 
     let result: any;
