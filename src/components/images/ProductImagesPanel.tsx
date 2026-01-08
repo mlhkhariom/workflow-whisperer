@@ -9,20 +9,21 @@ import { Upload, Image, Loader2, Copy, Check, Trash2, Search, RefreshCw, Pencil 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface StorageImage {
+interface CloudinaryImage {
   name: string;
   url: string;
+  public_id: string;
   created_at: string;
 }
 
 export function ProductImagesPanel() {
-  const [images, setImages] = useState<StorageImage[]>([]);
+  const [images, setImages] = useState<CloudinaryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [renameDialog, setRenameDialog] = useState<{ open: boolean; image: StorageImage | null }>({ open: false, image: null });
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; image: CloudinaryImage | null }>({ open: false, image: null });
   const [newFileName, setNewFileName] = useState("");
   const [renaming, setRenaming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,30 +31,14 @@ export function ProductImagesPanel() {
   const fetchImages = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.storage
-        .from('product-images')
-        .list('products', {
-          limit: 100,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
+      const { data, error } = await supabase.functions.invoke('cloudinary-upload', {
+        body: { action: 'list' },
+      });
 
       if (error) throw error;
+      if (!data.success) throw new Error(data.error);
 
-      const imageList: StorageImage[] = (data || [])
-        .filter(file => file.name.endsWith('.jpg') || file.name.endsWith('.jpeg'))
-        .map(file => {
-          const { data: { publicUrl } } = supabase.storage
-            .from('product-images')
-            .getPublicUrl(`products/${file.name}`);
-          
-          return {
-            name: file.name,
-            url: publicUrl,
-            created_at: file.created_at || ''
-          };
-        });
-
-      setImages(imageList);
+      setImages(data.images || []);
     } catch (error: any) {
       console.error('Error fetching images:', error);
       toast.error('Failed to load images');
@@ -79,22 +64,30 @@ export function ProductImagesPanel() {
 
     setUploading(true);
     try {
-      const timestamp = Date.now();
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
       const sanitizedName = file.name
         .toLowerCase()
-        .replace(/[^a-z0-9.]/g, '-')
+        .replace(/\.(jpg|jpeg)$/i, '')
+        .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-');
-      const fileName = `${timestamp}-${sanitizedName}`;
-      const filePath = `products/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
+      const { data, error } = await supabase.functions.invoke('cloudinary-upload', {
+        body: {
+          action: 'upload',
+          image: base64,
+          filename: `${sanitizedName}-${Date.now()}`,
+        },
+      });
 
-      if (uploadError) throw uploadError;
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
 
       toast.success('Image uploaded successfully');
       fetchImages();
@@ -113,16 +106,16 @@ export function ProductImagesPanel() {
     files.forEach(file => handleUpload(file));
   };
 
-  const handleDelete = async (fileName: string) => {
+  const handleDelete = async (public_id: string, name: string) => {
     try {
-      const { error } = await supabase.storage
-        .from('product-images')
-        .remove([`products/${fileName}`]);
+      const { data, error } = await supabase.functions.invoke('cloudinary-upload', {
+        body: { action: 'delete', public_id },
+      });
 
       if (error) throw error;
       
       toast.success('Image deleted');
-      setImages(prev => prev.filter(img => img.name !== fileName));
+      setImages(prev => prev.filter(img => img.public_id !== public_id));
     } catch (error: any) {
       toast.error('Failed to delete image');
     }
@@ -139,9 +132,8 @@ export function ProductImagesPanel() {
     }
   };
 
-  const openRenameDialog = (image: StorageImage) => {
-    const nameWithoutExt = image.name.replace(/\.(jpg|jpeg)$/i, '');
-    setNewFileName(nameWithoutExt);
+  const openRenameDialog = (image: CloudinaryImage) => {
+    setNewFileName(image.name);
     setRenameDialog({ open: true, image });
   };
 
@@ -159,42 +151,23 @@ export function ProductImagesPanel() {
       return;
     }
 
-    const newFullName = `${sanitizedName}.jpg`;
-    
-    if (newFullName === renameDialog.image.name) {
+    if (sanitizedName === renameDialog.image.name) {
       setRenameDialog({ open: false, image: null });
       return;
     }
 
     setRenaming(true);
     try {
-      // Download the existing file
-      const { data: fileData, error: downloadError } = await supabase.storage
-        .from('product-images')
-        .download(`products/${renameDialog.image.name}`);
+      const { data, error } = await supabase.functions.invoke('cloudinary-upload', {
+        body: {
+          action: 'rename',
+          from_public_id: renameDialog.image.public_id,
+          to_public_id: `product-images/${sanitizedName}`,
+        },
+      });
 
-      if (downloadError) throw downloadError;
-
-      // Upload with new name
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(`products/${newFullName}`, fileData, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        if (uploadError.message.includes('already exists')) {
-          toast.error('A file with this name already exists');
-          return;
-        }
-        throw uploadError;
-      }
-
-      // Delete old file
-      await supabase.storage
-        .from('product-images')
-        .remove([`products/${renameDialog.image.name}`]);
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
 
       toast.success('Image renamed successfully');
       setRenameDialog({ open: false, image: null });
@@ -217,7 +190,7 @@ export function ProductImagesPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Product Images</h1>
-          <p className="text-sm text-muted-foreground">Upload & manage product images with public URLs</p>
+          <p className="text-sm text-muted-foreground">Upload & manage product images on Cloudinary</p>
         </div>
         <Button onClick={fetchImages} variant="outline" size="sm">
           <RefreshCw className="w-4 h-4 mr-2" />
@@ -253,7 +226,7 @@ export function ProductImagesPanel() {
             {uploading ? (
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                <p className="text-sm text-muted-foreground">Uploading...</p>
+                <p className="text-sm text-muted-foreground">Uploading to Cloudinary...</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">
@@ -286,7 +259,7 @@ export function ProductImagesPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Image className="w-5 h-5" />
-            Uploaded Images ({filteredImages.length})
+            Cloudinary Images ({filteredImages.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -304,7 +277,7 @@ export function ProductImagesPanel() {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredImages.map((image) => (
                   <div 
-                    key={image.name}
+                    key={image.public_id}
                     className="group relative bg-secondary/30 rounded-xl overflow-hidden border border-border/30 hover:border-primary/50 transition-all"
                   >
                     <div className="aspect-square">
@@ -351,7 +324,7 @@ export function ProductImagesPanel() {
                         size="sm"
                         variant="destructive"
                         className="w-full text-xs"
-                        onClick={() => handleDelete(image.name)}
+                        onClick={() => handleDelete(image.public_id, image.name)}
                       >
                         <Trash2 className="w-3 h-3 mr-1" />
                         Delete
@@ -380,9 +353,9 @@ export function ProductImagesPanel() {
               <Copy className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-medium">Public URL Format</p>
+              <p className="text-sm font-medium">Cloudinary URL Format</p>
               <p className="text-xs text-muted-foreground mt-1 break-all font-mono bg-secondary/30 p-2 rounded">
-                https://dthlunjjxegdcpikighl.supabase.co/storage/v1/object/public/product-images/products/[filename].jpg
+                https://res.cloudinary.com/[cloud_name]/image/upload/product-images/[filename]
               </p>
             </div>
           </div>
@@ -414,17 +387,14 @@ export function ProductImagesPanel() {
             )}
             <div className="space-y-2">
               <Label htmlFor="newFileName">New filename</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="newFileName"
-                  value={newFileName}
-                  onChange={(e) => setNewFileName(e.target.value)}
-                  placeholder="Enter new filename"
-                  className="bg-secondary/30 border-border/50"
-                  onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                />
-                <span className="text-sm text-muted-foreground">.jpg</span>
-              </div>
+              <Input
+                id="newFileName"
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                placeholder="Enter new filename"
+                className="bg-secondary/30 border-border/50"
+                onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+              />
               <p className="text-xs text-muted-foreground">
                 Only letters, numbers, hyphens and underscores allowed
               </p>
