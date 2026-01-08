@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Upload, Image, Loader2, Copy, Check, Trash2, Search, RefreshCw, Pencil } from "lucide-react";
+import { Upload, Image, Loader2, Copy, Check, Trash2, Search, RefreshCw, Pencil, Cloud, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -26,6 +26,7 @@ export function ProductImagesPanel() {
   const [renameDialog, setRenameDialog] = useState<{ open: boolean; image: CloudinaryImage | null }>({ open: false, image: null });
   const [newFileName, setNewFileName] = useState("");
   const [renaming, setRenaming] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<CloudinaryImage | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchImages = async () => {
@@ -64,7 +65,6 @@ export function ProductImagesPanel() {
 
     setUploading(true);
     try {
-      // Convert file to base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -116,6 +116,7 @@ export function ProductImagesPanel() {
       
       toast.success('Image deleted');
       setImages(prev => prev.filter(img => img.public_id !== public_id));
+      setSelectedImage(null);
     } catch (error: any) {
       toast.error('Failed to delete image');
     }
@@ -185,24 +186,64 @@ export function ProductImagesPanel() {
   );
 
   return (
-    <div className="h-full flex flex-col p-6 space-y-6">
+    <div className="h-full flex flex-col p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6 overflow-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Product Images</h1>
-          <p className="text-sm text-muted-foreground">Upload & manage product images on Cloudinary</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Cloud className="w-6 h-6 text-primary" />
+            Product Images
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Upload & manage product images on Cloudinary</p>
         </div>
-        <Button onClick={fetchImages} variant="outline" size="sm">
+        <Button onClick={fetchImages} variant="outline" size="sm" className="w-full sm:w-auto">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>
       </div>
 
+      {/* Stats Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <Card className="glass-card border-border/50 p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Image className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-2xl font-bold">{images.length}</p>
+              <p className="text-xs text-muted-foreground">Total Images</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="glass-card border-border/50 p-3 sm:p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+              <Upload className="w-5 h-5 text-accent" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-2xl font-bold">5MB</p>
+              <p className="text-xs text-muted-foreground">Max Size</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="glass-card border-border/50 p-3 sm:p-4 col-span-2 sm:col-span-1">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+              <Cloud className="w-5 h-5 text-success" />
+            </div>
+            <div>
+              <p className="text-lg sm:text-2xl font-bold">JPG</p>
+              <p className="text-xs text-muted-foreground">Format Only</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
       {/* Upload Zone */}
       <Card className="glass-card border-border/50">
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div
-            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+            className={`border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all cursor-pointer ${
               dragOver 
                 ? 'border-primary bg-primary/10' 
                 : 'border-border/50 hover:border-primary/50 hover:bg-secondary/30'
@@ -225,16 +266,18 @@ export function ProductImagesPanel() {
             />
             {uploading ? (
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 text-primary animate-spin" />
+                </div>
                 <p className="text-sm text-muted-foreground">Uploading to Cloudinary...</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-primary" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                  <Upload className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Drag & Drop images here</p>
+                  <p className="text-sm sm:text-base font-medium">Drag & Drop images here</p>
                   <p className="text-xs text-muted-foreground">or click to browse (JPG only, max 5MB)</p>
                 </div>
               </div>
@@ -255,30 +298,41 @@ export function ProductImagesPanel() {
       </div>
 
       {/* Image Gallery */}
-      <Card className="glass-card border-border/50 flex-1">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Image className="w-5 h-5" />
-            Cloudinary Images ({filteredImages.length})
+      <Card className="glass-card border-border/50 flex-1 min-h-0">
+        <CardHeader className="pb-3 px-4 sm:px-6">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <Image className="w-5 h-5 text-primary" />
+            Cloudinary Gallery
+            <span className="ml-auto text-xs sm:text-sm font-normal text-muted-foreground bg-secondary/50 px-2 py-1 rounded-lg">
+              {filteredImages.length} images
+            </span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[calc(100vh-480px)]">
+        <CardContent className="px-4 sm:px-6">
+          <ScrollArea className="h-[calc(100vh-580px)] sm:h-[calc(100vh-520px)] md:h-[calc(100vh-480px)]">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
             ) : filteredImages.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                <Image className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No images uploaded yet</p>
+                <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
+                  <Image className="w-8 h-8 opacity-50" />
+                </div>
+                <p className="font-medium">No images uploaded yet</p>
+                <p className="text-xs mt-1">Upload your first product image above</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                 {filteredImages.map((image) => (
                   <div 
                     key={image.public_id}
-                    className="group relative bg-secondary/30 rounded-xl overflow-hidden border border-border/30 hover:border-primary/50 transition-all"
+                    className={`group relative bg-secondary/30 rounded-xl overflow-hidden border transition-all cursor-pointer ${
+                      selectedImage?.public_id === image.public_id 
+                        ? 'border-primary ring-2 ring-primary/30' 
+                        : 'border-border/30 hover:border-primary/50'
+                    }`}
+                    onClick={() => setSelectedImage(selectedImage?.public_id === image.public_id ? null : image)}
                   >
                     <div className="aspect-square">
                       <img 
@@ -291,13 +345,13 @@ export function ProductImagesPanel() {
                       />
                     </div>
                     
-                    {/* Overlay with actions */}
-                    <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3">
+                    {/* Overlay with actions - Desktop */}
+                    <div className="absolute inset-0 bg-background/90 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex flex-col items-center justify-center gap-2 p-3">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full text-xs"
-                        onClick={() => copyToClipboard(image.url)}
+                        className="w-full text-xs h-8"
+                        onClick={(e) => { e.stopPropagation(); copyToClipboard(image.url); }}
                       >
                         {copiedUrl === image.url ? (
                           <>
@@ -314,8 +368,8 @@ export function ProductImagesPanel() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="w-full text-xs"
-                        onClick={() => openRenameDialog(image)}
+                        className="w-full text-xs h-8"
+                        onClick={(e) => { e.stopPropagation(); openRenameDialog(image); }}
                       >
                         <Pencil className="w-3 h-3 mr-1" />
                         Rename
@@ -323,16 +377,23 @@ export function ProductImagesPanel() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        className="w-full text-xs"
-                        onClick={() => handleDelete(image.public_id, image.name)}
+                        className="w-full text-xs h-8"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(image.public_id, image.name); }}
                       >
                         <Trash2 className="w-3 h-3 mr-1" />
                         Delete
                       </Button>
                     </div>
 
+                    {/* Selection indicator */}
+                    {selectedImage?.public_id === image.public_id && (
+                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center sm:hidden">
+                        <Check className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                    )}
+
                     {/* File name */}
-                    <div className="p-2 bg-secondary/50">
+                    <div className="p-2 bg-secondary/70 backdrop-blur-sm">
                       <p className="text-xs text-muted-foreground truncate" title={image.name}>
                         {image.name}
                       </p>
@@ -345,18 +406,55 @@ export function ProductImagesPanel() {
         </CardContent>
       </Card>
 
+      {/* Mobile Action Bar */}
+      {selectedImage && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-xl border-t border-border animate-slide-up z-50">
+          <div className="flex items-center gap-2 mb-3">
+            <img src={selectedImage.url} alt="" className="w-10 h-10 rounded-lg object-cover" />
+            <p className="text-sm font-medium truncate flex-1">{selectedImage.name}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={() => copyToClipboard(selectedImage.url)}
+            >
+              <Copy className="w-4 h-4 mr-1" />
+              Copy
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => openRenameDialog(selectedImage)}
+            >
+              <Pencil className="w-4 h-4 mr-1" />
+              Rename
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => handleDelete(selectedImage.public_id, selectedImage.name)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* URL Format Info */}
       <Card className="glass-card border-border/50">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Copy className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0">
+              <ExternalLink className="w-5 h-5 text-primary" />
             </div>
-            <div>
-              <p className="text-sm font-medium">Cloudinary URL Format</p>
-              <p className="text-xs text-muted-foreground mt-1 break-all font-mono bg-secondary/30 p-2 rounded">
-                https://res.cloudinary.com/[cloud_name]/image/upload/product-images/[filename]
-              </p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium mb-1">Cloudinary URL Format</p>
+              <div className="text-xs text-muted-foreground font-mono bg-secondary/50 p-2 sm:p-3 rounded-lg overflow-x-auto">
+                <code className="break-all">https://res.cloudinary.com/[cloud]/image/upload/product-images/[file]</code>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -364,7 +462,7 @@ export function ProductImagesPanel() {
 
       {/* Rename Dialog */}
       <Dialog open={renameDialog.open} onOpenChange={(open) => !renaming && setRenameDialog({ open, image: open ? renameDialog.image : null })}>
-        <DialogContent className="sm:max-w-[425px] glass-card border-border/50">
+        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-[425px] glass-card border-border/50">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-primary" />
@@ -373,7 +471,7 @@ export function ProductImagesPanel() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             {renameDialog.image && (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary/30">
                 <img 
                   src={renameDialog.image.url} 
                   alt="Preview"
@@ -400,17 +498,19 @@ export function ProductImagesPanel() {
               </p>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button 
               variant="outline" 
               onClick={() => setRenameDialog({ open: false, image: null })}
               disabled={renaming}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleRename}
               disabled={renaming || !newFileName.trim()}
+              className="w-full sm:w-auto"
             >
               {renaming ? (
                 <>
