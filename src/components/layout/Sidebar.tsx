@@ -30,8 +30,8 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           </div>
           {!collapsed && (
             <div className="animate-fade-in">
-              <h1 className="font-bold text-lg text-foreground">TinoChat</h1>
-              <p className="text-xs text-muted-foreground">AI Sales Agent</p>
+              <h1 className="font-bold text-lg text-foreground">AI LaptopWala</h1>
+              <p className="text-xs text-muted-foreground">AdminPanel</p>
             </div>
           )}
         </div>
