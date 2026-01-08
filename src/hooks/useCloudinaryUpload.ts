@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export function useProductImageUpload() {
+export function useCloudinaryUpload() {
   const [uploading, setUploading] = useState(false);
 
-  const uploadImage = async (file: File, productName: string): Promise<string | null> => {
+  const uploadImage = async (file: File, filename?: string): Promise<string | null> => {
     // Validate file type - only JPG allowed
     if (!file.type.includes('jpeg') && !file.type.includes('jpg')) {
       toast.error('Only JPG/JPEG images are allowed');
@@ -29,22 +29,15 @@ export function useProductImageUpload() {
         reader.readAsDataURL(file);
       });
 
-      // Sanitize product name for file path
-      const sanitizedName = productName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
+      const sanitizedFilename = filename 
+        ? filename.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
+        : `image-${Date.now()}`;
 
-      const timestamp = Date.now();
-      const fileName = `${sanitizedName}-${timestamp}`;
-
-      // Upload to Cloudinary via edge function
       const { data, error } = await supabase.functions.invoke('cloudinary-upload', {
         body: {
           action: 'upload',
           image: base64,
-          filename: fileName,
+          filename: sanitizedFilename,
         },
       });
 
