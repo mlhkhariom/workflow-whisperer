@@ -588,10 +588,19 @@ export function ProductsPanel() {
               const status = statusConfig[product.status] || statusConfig.active;
               const StatusIcon = status.icon;
               
+              const cardStatusClass = product.status === 'out_of_stock' 
+                ? 'border-destructive/50 bg-destructive/5' 
+                : product.status === 'low_stock' 
+                  ? 'border-warning/50 bg-warning/5' 
+                  : '';
+              
               return (
                 <Card 
                   key={product.id}
-                  className="glass-card overflow-hidden group hover:border-primary/30 transition-all animate-fade-in"
+                  className={cn(
+                    "glass-card overflow-hidden group hover:border-primary/30 transition-all animate-fade-in",
+                    cardStatusClass
+                  )}
                   style={{ animationDelay: `${i * 30}ms` }}
                 >
                   {/* Product Image */}
