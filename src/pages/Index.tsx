@@ -30,12 +30,16 @@ const Index = () => {
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden md:ml-0">
+        {/* Mobile top padding for fixed header */}
+        <div className="h-14 md:hidden shrink-0" />
+        
+        <main className="flex-1 overflow-auto">
           {renderContent()}
         </main>
-        <footer className="py-3 px-6 border-t border-border bg-card/50 backdrop-blur-sm">
-          <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
+        
+        <footer className="py-3 px-4 sm:px-6 border-t border-border bg-card/50 backdrop-blur-sm shrink-0">
+          <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1 flex-wrap">
             Build With <Heart className="w-3 h-3 text-destructive fill-destructive" /> By MLHK Infotech (Hariom Vishwkarma)
           </p>
         </footer>
