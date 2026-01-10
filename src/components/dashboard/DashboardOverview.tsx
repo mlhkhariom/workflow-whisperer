@@ -1,5 +1,8 @@
-import { MessageSquare, Users, Package, TrendingUp, Activity, Clock, ArrowUpRight } from "lucide-react";
+import { MessageSquare, Users, Package, TrendingUp, Activity, Clock, ArrowUpRight, PieChart as PieChartIcon, BarChart3 } from "lucide-react";
 import { StatsCard } from "./StatsCard";
+import { InventoryPieChart } from "./InventoryPieChart";
+import { StockBarChart } from "./StockBarChart";
+import { ChatStatsCard } from "./ChatStatsCard";
 import { useProducts } from "@/hooks/useN8nData";
 import { useChats } from "@/hooks/useN8nData";
 
@@ -9,6 +12,7 @@ export function DashboardOverview() {
 
   const totalProducts = products.length;
   const lowStockCount = products.filter(p => p.status === "low_stock").length;
+  const outOfStockCount = products.filter(p => p.status === "out_of_stock").length;
   const totalConversations = contacts.length;
 
   return (
@@ -63,6 +67,56 @@ export function DashboardOverview() {
           variant="warning"
           trend="up"
         />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Inventory Distribution */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <PieChartIcon className="w-5 h-5 text-primary" />
+              Inventory Distribution
+            </h3>
+          </div>
+          <InventoryPieChart />
+        </div>
+
+        {/* Stock Levels */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-warning" />
+              Stock Levels
+            </h3>
+          </div>
+          <StockBarChart />
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 rounded-lg bg-success/10 border border-success/20">
+              <p className="text-lg font-bold text-success">{products.filter(p => p.status === 'active').length}</p>
+              <p className="text-[10px] text-muted-foreground">In Stock</p>
+            </div>
+            <div className="p-2 rounded-lg bg-warning/10 border border-warning/20">
+              <p className="text-lg font-bold text-warning">{lowStockCount}</p>
+              <p className="text-[10px] text-muted-foreground">Low Stock</p>
+            </div>
+            <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+              <p className="text-lg font-bold text-destructive">{outOfStockCount}</p>
+              <p className="text-[10px] text-muted-foreground">Out of Stock</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Analytics */}
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-accent" />
+              Chat Analytics
+            </h3>
+          </div>
+          <ChatStatsCard />
+        </div>
       </div>
 
       {/* Activity Cards */}
@@ -143,7 +197,7 @@ export function DashboardOverview() {
                   <div className={`w-1.5 h-12 rounded-full bg-gradient-to-b ${color}`} />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate group-hover:text-accent transition-colors">
-                      {product.name}
+                      {product.name || product.displayName}
                     </p>
                     <p className="text-xs text-muted-foreground capitalize">{product.category}</p>
                   </div>
