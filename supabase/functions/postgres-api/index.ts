@@ -95,14 +95,19 @@ serve(async (req) => {
         `);
         return jsonResponse(result.rows);
 
-      case 'add-laptop':
+      case 'add-laptop': {
+        // Get next row_number
+        const maxRowLaptop = await client.queryObject<{ max: number }>(`SELECT COALESCE(MAX(row_number), 0) as max FROM laptops`);
+        const nextRowLaptop = (maxRowLaptop.rows[0]?.max || 0) + 1;
+        
         result = await client.queryObject(
-          `INSERT INTO laptops (brand, model, processor, generation, ram_gb, storage_type, storage_gb,
+          `INSERT INTO laptops (row_number, brand, model, processor, generation, ram_gb, storage_type, storage_gb,
                                 screen_size, graphics, condition, price_range, stock_quantity, 
                                 special_feature, warranty_in_months, image_url_1, image_url_2, updated_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW()) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW()) 
            RETURNING *`,
           [
+            nextRowLaptop,
             data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
             data?.ram_gb || null, data?.storage_type || '', data?.storage_gb || null,
             data?.screen_size || '', data?.graphics || '', data?.condition || 'Used',
@@ -111,6 +116,7 @@ serve(async (req) => {
           ]
         );
         return jsonResponse(result.rows[0] || { success: true });
+      }
 
       case 'update-laptop':
         result = await client.queryObject(
@@ -145,14 +151,19 @@ serve(async (req) => {
         `);
         return jsonResponse(result.rows);
 
-      case 'add-desktop':
+      case 'add-desktop': {
+        // Get next row_number
+        const maxRowDesktop = await client.queryObject<{ max: number }>(`SELECT COALESCE(MAX(row_number), 0) as max FROM desktops`);
+        const nextRowDesktop = (maxRowDesktop.rows[0]?.max || 0) + 1;
+        
         result = await client.queryObject(
-          `INSERT INTO desktops (brand, model, processor, generation, ram_gb, ram_type, storage_gb,
+          `INSERT INTO desktops (row_number, brand, model, processor, generation, ram_gb, ram_type, storage_gb,
                                  monitor_size, graphics, condition, price_range, stock_quantity,
                                  special_feature, warranty_in_months, image_url_1, image_url_2, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
            RETURNING *`,
           [
+            nextRowDesktop,
             data?.brand || '', data?.model || '', data?.processor || '', data?.generation || '',
             data?.ram_gb || null, data?.ram_type || '', data?.storage_gb || null,
             data?.monitor_size || '', data?.graphics || '', data?.condition || 'Used',
@@ -161,6 +172,7 @@ serve(async (req) => {
           ]
         );
         return jsonResponse(result.rows[0] || { success: true });
+      }
 
       case 'update-desktop':
         result = await client.queryObject(
@@ -193,13 +205,18 @@ serve(async (req) => {
         `);
         return jsonResponse(result.rows);
 
-      case 'add-accessory':
+      case 'add-accessory': {
+        // Get next row_number
+        const maxRowAccessory = await client.queryObject<{ max: number }>(`SELECT COALESCE(MAX(row_number), 0) as max FROM accessories`);
+        const nextRowAccessory = (maxRowAccessory.rows[0]?.max || 0) + 1;
+        
         result = await client.queryObject(
-          `INSERT INTO accessories (accessories_name, price_range_inr, image_url_1, image_url_2, updated_at)
-           VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
-          [data?.name || '', data?.price_range || '', data?.image_url_1 || null, data?.image_url_2 || null]
+          `INSERT INTO accessories (row_number, accessories_name, price_range_inr, image_url_1, image_url_2, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
+          [nextRowAccessory, data?.name || '', data?.price_range || '', data?.image_url_1 || null, data?.image_url_2 || null]
         );
         return jsonResponse(result.rows[0] || { success: true });
+      }
 
       case 'update-accessory':
         result = await client.queryObject(
