@@ -239,11 +239,36 @@ export function ProductsPanel() {
     categoryFilter !== 'all',
   ].filter(Boolean).length;
 
-  const FiltersContent = () => (
+  // Handle filter changes with mobile sheet auto-close
+  const handleCategoryChange = (value: string) => {
+    setCategoryFilter(value);
+    setMobileFiltersOpen(false);
+  };
+
+  const handleStatusChange = (value: StatusFilter) => {
+    setStatusFilter(value);
+    setMobileFiltersOpen(false);
+  };
+
+  const handleSortChange = (value: SortOption) => {
+    setSortBy(value);
+    setMobileFiltersOpen(false);
+  };
+
+  const handleClearFilters = () => {
+    setStatusFilter('all');
+    setCategoryFilter('all');
+    setMobileFiltersOpen(false);
+  };
+
+  const FiltersContent = ({ closeOnChange = false }: { closeOnChange?: boolean }) => (
     <div className="space-y-4">
       <div className="space-y-2">
         <label className="text-sm font-medium">Category</label>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+        <Select 
+          value={categoryFilter} 
+          onValueChange={closeOnChange ? handleCategoryChange : setCategoryFilter}
+        >
           <SelectTrigger className="w-full bg-secondary/30 border-border/50">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
@@ -270,7 +295,10 @@ export function ProductsPanel() {
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Status</label>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+        <Select 
+          value={statusFilter} 
+          onValueChange={(v) => closeOnChange ? handleStatusChange(v as StatusFilter) : setStatusFilter(v as StatusFilter)}
+        >
           <SelectTrigger className="w-full bg-secondary/30 border-border/50">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -297,7 +325,10 @@ export function ProductsPanel() {
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Sort By</label>
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+        <Select 
+          value={sortBy} 
+          onValueChange={(v) => closeOnChange ? handleSortChange(v as SortOption) : setSortBy(v as SortOption)}
+        >
           <SelectTrigger className="w-full bg-secondary/30 border-border/50">
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
@@ -316,10 +347,7 @@ export function ProductsPanel() {
         <Button 
           variant="outline" 
           className="w-full" 
-          onClick={() => {
-            setStatusFilter('all');
-            setCategoryFilter('all');
-          }}
+          onClick={handleClearFilters}
         >
           <X className="w-4 h-4 mr-2" />
           Clear Filters
@@ -461,7 +489,7 @@ export function ProductsPanel() {
                 <SheetTitle>Filters & Sort</SheetTitle>
               </SheetHeader>
               <div className="mt-6">
-                <FiltersContent />
+                <FiltersContent closeOnChange={true} />
               </div>
             </SheetContent>
           </Sheet>
