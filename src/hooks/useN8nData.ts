@@ -311,10 +311,30 @@ function deriveContactsFromMessages(messages: NormalizedMessage[]): ChatContact[
     const lastMsg = sorted[0];
     const unreadCount = sorted.filter(m => m.role === 'user').length;
 
+    // Try to extract phone number from contactId if it looks like a phone number
+    // Format: could be UUID or phone number based format
+    let phoneNumber = '';
+    let displayName = `Contact ${contactId.slice(0, 8)}`;
+    
+    // Check if contactId contains digits that could be a phone number
+    const phoneMatch = contactId.match(/\d{10,15}/);
+    if (phoneMatch) {
+      phoneNumber = phoneMatch[0];
+      // Format phone for display
+      if (phoneNumber.length >= 10) {
+        const formatted = phoneNumber.startsWith('91') 
+          ? `+${phoneNumber.slice(0, 2)} ${phoneNumber.slice(2, 7)} ${phoneNumber.slice(7)}`
+          : phoneNumber.length === 10
+            ? `${phoneNumber.slice(0, 5)} ${phoneNumber.slice(5)}`
+            : `+${phoneNumber}`;
+        displayName = formatted;
+      }
+    }
+
     contacts.push({
       id: contactId,
-      name: `Contact ${contactId.slice(0, 8)}`,
-      phoneNumber: '',
+      name: displayName,
+      phoneNumber: phoneNumber,
       lastMessage: lastMsg?.content ?? '',
       time: lastMsg?.created_at ? formatRelativeTime(lastMsg.created_at) : '',
       unread: Math.min(unreadCount, 9),
@@ -389,5 +409,82 @@ export function useSendMessage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-messages'] });
     },
+  });
+}
+
+// ==================== WHATSAPP API ====================
+
+async function callWhatsAppApi<T>(action: string, data?: unknown): Promise<T> {
+  const { data: response, error } = await supabase.functions.invoke('whatsapp-api', {
+    body: { action, data },
+  });
+
+  if (error) {
+    console.error('WhatsApp API error:', error);
+    throw new Error(error.message);
+  }
+
+  if (response?.error) {
+    throw new Error(response.error);
+  }
+
+  return response;
+}
+
+export function useSendWhatsAppMessage() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      phoneNumber, 
+      message, 
+      contactId,
+      templateName,
+      templateLanguage,
+      templateFields
+    }: { 
+      phoneNumber: string; 
+      message?: string;
+      contactId: string;
+      templateName?: string;
+      templateLanguage?: string;
+      templateFields?: Record<string, string>;
+    }) => {
+      // Send via WhatsApp API
+      const whatsappResult = await callWhatsAppApi('send-message', {
+        phone_number: phoneNumber,
+        message_body: message,
+        template_name: templateName,
+        template_language: templateLanguage,
+        ...templateFields
+      });
+      
+      // Also save to local database for history
+      await callApi('send-message', { contactId, message: message || `[Template: ${templateName}]` });
+      
+      return whatsappResult;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-messages'] });
+    },
+  });
+}
+
+export function useWhatsAppContacts() {
+  return useQuery({
+    queryKey: ['whatsapp-contacts'],
+    queryFn: () => callWhatsAppApi<{ success: boolean; data: any }>('get-contacts'),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useWhatsAppMessages(contactUid?: string) {
+  return useQuery({
+    queryKey: ['whatsapp-messages', contactUid],
+    queryFn: () => callWhatsAppApi<{ success: boolean; data: any }>('get-messages', { contact_uid: contactUid }),
+    staleTime: 10_000,
+    refetchInterval: 10_000,
+    enabled: !!contactUid,
   });
 }

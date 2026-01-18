@@ -1,12 +1,14 @@
-import { User, Bot, MoreVertical, Loader2, Phone, MessageCircle, Check, CheckCheck, PanelRightOpen, PanelRightClose } from "lucide-react";
+import { User, Bot, MoreVertical, Loader2, Phone, MessageCircle, Check, CheckCheck, PanelRightOpen, PanelRightClose, Send, Paperclip, Smile } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useChatMessages, type ChatContact } from "@/hooks/useN8nData";
+import { Input } from "@/components/ui/input";
+import { useChatMessages, useSendWhatsAppMessage, type ChatContact } from "@/hooks/useN8nData";
 import { useEffect, useRef, useMemo, useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageTemplates } from "./MessageTemplates";
 import { ContactTags } from "./ContactTags";
+import { toast } from "sonner";
 
 interface ChatWindowProps {
   contactId: string | null;
@@ -53,6 +55,9 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
   const { data: messages = [], isLoading, error } = useChatMessages(contactId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [messageInput, setMessageInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const sendMessage = useSendWhatsAppMessage();
 
   const messageGroups = useMemo(() => getMessageGroups(messages), [messages]);
 
@@ -61,6 +66,36 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageInput.trim() || !contactId || !contact?.phoneNumber) {
+      if (!contact?.phoneNumber) {
+        toast.error('Phone number not available for this contact');
+      }
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await sendMessage.mutateAsync({
+        phoneNumber: contact.phoneNumber,
+        message: messageInput.trim(),
+        contactId,
+      });
+      setMessageInput('');
+      toast.success('Message sent successfully!');
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      toast.error('Failed to send message. Please try again.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleTemplateSelect = (templateText: string) => {
+    setMessageInput(templateText);
+  };
 
   if (!contactId) {
     return (
@@ -239,14 +274,52 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
           </div>
         </ScrollArea>
 
-        {/* Footer */}
+        {/* Message Input */}
         <div className="px-6 py-4 border-t border-border/50 bg-card/30 backdrop-blur-sm">
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <div className="flex items-center gap-1.5 text-xs bg-secondary/30 px-3 py-1.5 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              <span>Read-only view • WhatsApp Conversations</span>
+          <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="icon" 
+              className="shrink-0 rounded-xl hover:bg-secondary/50"
+            >
+              <Paperclip className="w-5 h-5 text-muted-foreground" />
+            </Button>
+            <div className="flex-1 relative">
+              <Input
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                placeholder={contact?.phoneNumber ? "Type a message..." : "No phone number available"}
+                className="pr-12 bg-secondary/30 border-border/50 h-12 rounded-xl focus:ring-2 focus:ring-primary/30"
+                disabled={isSending || !contact?.phoneNumber}
+              />
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg hover:bg-secondary/50"
+              >
+                <Smile className="w-5 h-5 text-muted-foreground" />
+              </Button>
             </div>
-          </div>
+            <Button 
+              type="submit" 
+              size="icon"
+              disabled={isSending || !messageInput.trim() || !contact?.phoneNumber}
+              className="shrink-0 h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 disabled:opacity-50"
+            >
+              {isSending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </Button>
+          </form>
+          {!contact?.phoneNumber && contactId && (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              Phone number not available for this contact
+            </p>
+          )}
         </div>
       </div>
 
@@ -260,7 +333,7 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
           <div className="border-t border-border/30" />
           
           {/* Message Templates */}
-          <MessageTemplates />
+          <MessageTemplates onSelectTemplate={handleTemplateSelect} />
         </div>
       )}
     </div>
