@@ -240,6 +240,25 @@ serve(async (req) => {
         `);
         return jsonResponse(result.rows);
 
+      case 'get-contacts':
+        // Try to get contacts from a contacts table if it exists
+        try {
+          result = await client.queryObject(`
+            SELECT uid, name, phone_number, email, created_at, updated_at
+            FROM contacts 
+            ORDER BY updated_at DESC NULLS LAST
+          `);
+          return jsonResponse(result.rows);
+        } catch (e) {
+          // If contacts table doesn't exist, derive from chat_messages
+          console.log('No contacts table, deriving from chat_messages');
+          result = await client.queryObject(`
+            SELECT DISTINCT contact_uid 
+            FROM chat_messages
+          `);
+          return jsonResponse(result.rows);
+        }
+
       case 'send-message':
         result = await client.queryObject(
           `INSERT INTO chat_messages (contact_uid, content, role, created_at) 
