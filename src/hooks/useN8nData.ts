@@ -235,6 +235,8 @@ interface RawChatMessage {
   content?: string;
   role?: 'user' | 'assistant';
   created_at?: string;
+  mobile_number?: string;
+  image_url?: string;
 }
 
 interface NormalizedMessage {
@@ -243,6 +245,8 @@ interface NormalizedMessage {
   content: string;
   role: 'user' | 'assistant';
   created_at: string;
+  mobileNumber: string;
+  imageUrl: string;
 }
 
 export interface ChatMessage {
@@ -251,6 +255,7 @@ export interface ChatMessage {
   message: string;
   sender: 'user' | 'agent';
   timestamp: string;
+  imageUrl?: string;
 }
 
 export interface ChatContact {
@@ -272,6 +277,8 @@ function normalizeRawMessage(raw: RawChatMessage): NormalizedMessage | null {
     content: raw.content || '',
     role: raw.role || 'user',
     created_at: raw.created_at || new Date().toISOString(),
+    mobileNumber: raw.mobile_number || '',
+    imageUrl: raw.image_url || '',
   };
 }
 
@@ -292,42 +299,58 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 function deriveContactsFromMessages(messages: NormalizedMessage[]): ChatContact[] {
-  const contactMap = new Map<string, NormalizedMessage[]>();
+  const contactMap = new Map<string, { msgs: NormalizedMessage[]; mobileNumber: string }>();
 
   for (const msg of messages) {
     if (!msg.contactUid) continue;
     if (!contactMap.has(msg.contactUid)) {
-      contactMap.set(msg.contactUid, []);
+      contactMap.set(msg.contactUid, { msgs: [], mobileNumber: '' });
     }
-    contactMap.get(msg.contactUid)!.push(msg);
+    const contactData = contactMap.get(msg.contactUid)!;
+    contactData.msgs.push(msg);
+    // Use mobile_number from any message if available
+    if (msg.mobileNumber && !contactData.mobileNumber) {
+      contactData.mobileNumber = msg.mobileNumber;
+    }
   }
 
   const contacts: ChatContact[] = [];
 
-  for (const [contactId, msgs] of contactMap.entries()) {
-    const sorted = msgs.sort(
+  for (const [contactId, contactData] of contactMap.entries()) {
+    const sorted = contactData.msgs.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
     const lastMsg = sorted[0];
     const unreadCount = sorted.filter(m => m.role === 'user').length;
 
-    // Try to extract phone number from contactId if it looks like a phone number
-    // Format: could be UUID or phone number based format
-    let phoneNumber = '';
+    // Use mobile_number from database if available, otherwise try to extract from contactId
+    let phoneNumber = contactData.mobileNumber;
     let displayName = `Contact ${contactId.slice(0, 8)}`;
     
-    // Check if contactId contains digits that could be a phone number
-    const phoneMatch = contactId.match(/\d{10,15}/);
-    if (phoneMatch) {
-      phoneNumber = phoneMatch[0];
+    if (phoneNumber) {
       // Format phone for display
       if (phoneNumber.length >= 10) {
-        const formatted = phoneNumber.startsWith('91') 
-          ? `+${phoneNumber.slice(0, 2)} ${phoneNumber.slice(2, 7)} ${phoneNumber.slice(7)}`
-          : phoneNumber.length === 10
-            ? `${phoneNumber.slice(0, 5)} ${phoneNumber.slice(5)}`
-            : `+${phoneNumber}`;
-        displayName = formatted;
+        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        displayName = cleanPhone.startsWith('91') 
+          ? `+${cleanPhone.slice(0, 2)} ${cleanPhone.slice(2, 7)} ${cleanPhone.slice(7)}`
+          : cleanPhone.length === 10
+            ? `${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}`
+            : `+${cleanPhone}`;
+      }
+    } else {
+      // Try to extract phone number from contactId if it looks like a phone number
+      const phoneMatch = contactId.match(/\d{10,15}/);
+      if (phoneMatch) {
+        phoneNumber = phoneMatch[0];
+        // Format phone for display
+        if (phoneNumber.length >= 10) {
+          const formatted = phoneNumber.startsWith('91') 
+            ? `+${phoneNumber.slice(0, 2)} ${phoneNumber.slice(2, 7)} ${phoneNumber.slice(7)}`
+            : phoneNumber.length === 10
+              ? `${phoneNumber.slice(0, 5)} ${phoneNumber.slice(5)}`
+              : `+${phoneNumber}`;
+          displayName = formatted;
+        }
       }
     }
 
@@ -343,8 +366,8 @@ function deriveContactsFromMessages(messages: NormalizedMessage[]): ChatContact[
   }
 
   contacts.sort((a, b) => {
-    const aTime = contactMap.get(a.id)?.[0]?.created_at ?? '';
-    const bTime = contactMap.get(b.id)?.[0]?.created_at ?? '';
+    const aTime = contactMap.get(a.id)?.msgs[0]?.created_at ?? '';
+    const bTime = contactMap.get(b.id)?.msgs[0]?.created_at ?? '';
     return new Date(bTime).getTime() - new Date(aTime).getTime();
   });
 
@@ -358,6 +381,7 @@ function normalizeToChatMessage(raw: NormalizedMessage): ChatMessage {
     message: raw.content,
     sender: raw.role === 'assistant' ? 'agent' : 'user',
     timestamp: raw.created_at,
+    imageUrl: raw.imageUrl || undefined,
   };
 }
 
@@ -404,8 +428,8 @@ export function useSendMessage() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ contactId, message }: { contactId: string; message: string }) => 
-      callApi('send-message', { contactId, message }),
+    mutationFn: ({ contactId, message, imageUrl }: { contactId: string; message: string; imageUrl?: string }) => 
+      callApi('send-message', { contactId, message, image_url: imageUrl }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-messages'] });
     },
@@ -439,6 +463,7 @@ export function useSendWhatsAppMessage() {
       phoneNumber, 
       message, 
       contactId,
+      imageUrl,
       templateName,
       templateLanguage,
       templateFields
@@ -446,6 +471,7 @@ export function useSendWhatsAppMessage() {
       phoneNumber: string; 
       message?: string;
       contactId: string;
+      imageUrl?: string;
       templateName?: string;
       templateLanguage?: string;
       templateFields?: Record<string, string>;
@@ -459,8 +485,13 @@ export function useSendWhatsAppMessage() {
         ...templateFields
       });
       
-      // Also save to local database for history
-      await callApi('send-message', { contactId, message: message || `[Template: ${templateName}]` });
+      // Also save to local database for history with mobile_number and image_url
+      await callApi('send-message', { 
+        contactId, 
+        message: message || `[Template: ${templateName}]`,
+        mobile_number: phoneNumber,
+        image_url: imageUrl || null
+      });
       
       return whatsappResult;
     },
