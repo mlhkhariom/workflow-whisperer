@@ -234,7 +234,7 @@ serve(async (req) => {
       // ==================== CHATS ====================
       case 'get-chats':
         result = await client.queryObject(`
-          SELECT id, contact_uid, role, content, created_at 
+          SELECT id, contact_uid, role, content, created_at, mobile_number, image_url 
           FROM chat_messages 
           ORDER BY created_at DESC
         `);
@@ -261,9 +261,9 @@ serve(async (req) => {
 
       case 'send-message':
         result = await client.queryObject(
-          `INSERT INTO chat_messages (contact_uid, content, role, created_at) 
-           VALUES ($1, $2, 'assistant', NOW()) RETURNING *`,
-          [data?.contactId, data?.message]
+          `INSERT INTO chat_messages (contact_uid, content, role, created_at, mobile_number, image_url) 
+           VALUES ($1, $2, 'assistant', NOW(), $3, $4) RETURNING *`,
+          [data?.contactId, data?.message, data?.mobile_number || null, data?.image_url || null]
         );
         return jsonResponse(result.rows[0] || { success: true });
 

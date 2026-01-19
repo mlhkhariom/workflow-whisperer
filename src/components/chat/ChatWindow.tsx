@@ -1,9 +1,10 @@
-import { User, Bot, MoreVertical, Loader2, Phone, MessageCircle, Check, CheckCheck, PanelRightOpen, PanelRightClose, Send, Paperclip, Smile } from "lucide-react";
+import { User, Bot, MoreVertical, Loader2, Phone, MessageCircle, Check, CheckCheck, PanelRightOpen, PanelRightClose, Send, Paperclip, Smile, Image, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { useChatMessages, useSendWhatsAppMessage, type ChatContact } from "@/hooks/useN8nData";
+import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { useEffect, useRef, useMemo, useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageTemplates } from "./MessageTemplates";
@@ -35,7 +36,7 @@ function formatDate(dateStr: string): string {
   }
 }
 
-function getMessageGroups(messages: { id: string; message: string; sender: string; timestamp: string }[]) {
+function getMessageGroups(messages: { id: string; message: string; sender: string; timestamp: string; imageUrl?: string }[]) {
   const groups: { date: string; messages: typeof messages }[] = [];
   
   messages.forEach(msg => {
@@ -54,10 +55,13 @@ function getMessageGroups(messages: { id: string; message: string; sender: strin
 export function ChatWindow({ contactId, contact }: ChatWindowProps) {
   const { data: messages = [], isLoading, error } = useChatMessages(contactId);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null);
   const sendMessage = useSendWhatsAppMessage();
+  const { uploadImage, uploading } = useCloudinaryUpload();
 
   const messageGroups = useMemo(() => getMessageGroups(messages), [messages]);
 
@@ -67,9 +71,50 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
     }
   }, [messages]);
 
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingImage?.preview) {
+        URL.revokeObjectURL(pendingImage.preview);
+      }
+    };
+  }, [pendingImage]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type - only JPG allowed for Cloudinary
+    if (!file.type.includes('jpeg') && !file.type.includes('jpg')) {
+      toast.error('Only JPG/JPEG images are allowed');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setPendingImage({ file, preview });
+    
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removePendingImage = () => {
+    if (pendingImage?.preview) {
+      URL.revokeObjectURL(pendingImage.preview);
+    }
+    setPendingImage(null);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !contactId || !contact?.phoneNumber) {
+    if ((!messageInput.trim() && !pendingImage) || !contactId || !contact?.phoneNumber) {
       if (!contact?.phoneNumber) {
         toast.error('Phone number not available for this contact');
       }
@@ -78,12 +123,30 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
 
     setIsSending(true);
     try {
+      let imageUrl: string | undefined;
+
+      // Upload image to Cloudinary if present
+      if (pendingImage) {
+        const filename = `chat-${contactId}-${Date.now()}`;
+        const uploadedUrl = await uploadImage(pendingImage.file, filename);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          toast.error('Failed to upload image');
+          setIsSending(false);
+          return;
+        }
+      }
+
       await sendMessage.mutateAsync({
         phoneNumber: contact.phoneNumber,
-        message: messageInput.trim(),
+        message: messageInput.trim() || (imageUrl ? '[Image]' : ''),
         contactId,
+        imageUrl,
       });
+      
       setMessageInput('');
+      removePendingImage();
       toast.success('Message sent successfully!');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -249,9 +312,22 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
                               ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-br-md" 
                               : "bg-card border border-border/50 text-foreground rounded-bl-md"
                           )}>
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">
-                              {message.message}
-                            </p>
+                            {/* Image if present */}
+                            {message.imageUrl && (
+                              <div className="mb-2">
+                                <img 
+                                  src={message.imageUrl} 
+                                  alt="Shared image" 
+                                  className="rounded-lg max-w-full max-h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => window.open(message.imageUrl, '_blank')}
+                                />
+                              </div>
+                            )}
+                            {message.message && message.message !== '[Image]' && (
+                              <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">
+                                {message.message}
+                              </p>
+                            )}
                           </div>
                           <div className={cn(
                             "flex items-center gap-1 mt-1 px-1",
@@ -274,16 +350,51 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
           </div>
         </ScrollArea>
 
+        {/* Pending Image Preview */}
+        {pendingImage && (
+          <div className="px-6 py-2 border-t border-border/30 bg-card/20">
+            <div className="relative inline-block">
+              <img 
+                src={pendingImage.preview} 
+                alt="Pending upload" 
+                className="h-20 w-20 object-cover rounded-lg border border-border/50"
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                onClick={removePendingImage}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Message Input */}
         <div className="px-6 py-4 border-t border-border/50 bg-card/30 backdrop-blur-sm">
           <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/jpeg,image/jpg"
+              className="hidden"
+            />
             <Button 
               type="button" 
               variant="ghost" 
               size="icon" 
               className="shrink-0 rounded-xl hover:bg-secondary/50"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isSending || uploading || !contact?.phoneNumber}
             >
-              <Paperclip className="w-5 h-5 text-muted-foreground" />
+              {uploading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              ) : (
+                <Paperclip className="w-5 h-5 text-muted-foreground" />
+              )}
             </Button>
             <div className="flex-1 relative">
               <Input
@@ -305,10 +416,10 @@ export function ChatWindow({ contactId, contact }: ChatWindowProps) {
             <Button 
               type="submit" 
               size="icon"
-              disabled={isSending || !messageInput.trim() || !contact?.phoneNumber}
+              disabled={isSending || uploading || (!messageInput.trim() && !pendingImage) || !contact?.phoneNumber}
               className="shrink-0 h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 disabled:opacity-50"
             >
-              {isSending ? (
+              {isSending || uploading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <Send className="w-5 h-5" />
